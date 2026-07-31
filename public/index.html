@@ -1,0 +1,301 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+  <title>BLACKWING // AFTERBURN — 네온 제트 슈터</title>
+  <meta name="description" content="아슬아슬한 회피로 오버드라이브를 충전하고, 다중 록온 미사일로 적 편대와 거대 공중항모를 격침하는 초고속 제트 슈터.">
+  <link rel="canonical" href="https://sturdy-forest-342.higgsfield.gg/">
+
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="BLACKWING // AFTERBURN">
+  <meta property="og:title" content="BLACKWING // AFTERBURN">
+  <meta property="og:description" content="LOCK / BREAK / BURN — 회피를 화력으로 바꾸는 초고속 제트 슈터.">
+  <meta property="og:image" content="https://sturdy-forest-342.higgsfield.gg/og/thumbnail.png">
+  <meta property="og:image:width" content="1280">
+  <meta property="og:image:height" content="720">
+  <meta property="og:url" content="https://sturdy-forest-342.higgsfield.gg/">
+  <meta property="og:locale" content="ko_KR">
+
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="BLACKWING // AFTERBURN">
+  <meta name="twitter:description" content="LOCK / BREAK / BURN — 회피를 화력으로 바꾸는 초고속 제트 슈터.">
+  <meta name="twitter:image" content="https://sturdy-forest-342.higgsfield.gg/og/thumbnail.png">
+
+  <meta name="theme-color" content="#020916">
+  <link rel="icon" href="./assets/favicon.ico" sizes="32x32">
+  <link rel="icon" href="./assets/icon.svg" type="image/svg+xml">
+  <link rel="icon" type="image/png" href="./assets/icon-192.png" sizes="192x192">
+  <link rel="apple-touch-icon" href="./assets/apple-touch-icon.png">
+  <link rel="manifest" href="./site.webmanifest">
+  <style>
+    :root {
+      color-scheme: dark;
+      --ink-950: #020916;
+      --ink-900: #061324;
+      --ink-700: #143149;
+      --cyan-300: #8ef5ff;
+      --cyan-400: #31eaff;
+      --cyan-500: #00cfe8;
+      --orange-400: #ff8a38;
+      --white: #f4fbff;
+      --glass: rgba(3, 15, 31, .78);
+      --glass-soft: rgba(8, 28, 49, .58);
+      --focus: #ffffff;
+      --safe-bottom: env(safe-area-inset-bottom, 0px);
+    }
+    * { box-sizing: border-box; }
+    html, body {
+      width: 100%;
+      height: 100%;
+      margin: 0;
+      overflow: hidden;
+      background: radial-gradient(circle at 50% 30%, var(--ink-700), var(--ink-950) 65%);
+      font-family: Bahnschrift, "Segoe UI", sans-serif;
+      color: var(--white);
+      touch-action: none;
+      user-select: none;
+      word-break: keep-all;
+    }
+    button, input { font: inherit; }
+    button {
+      color: var(--white);
+      border: 1px solid rgba(49, 234, 255, .55);
+      background: linear-gradient(180deg, rgba(17, 54, 79, .96), rgba(4, 20, 37, .96));
+      box-shadow: inset 0 0 22px rgba(0, 207, 232, .08), 0 8px 28px rgba(0, 0, 0, .34);
+      cursor: pointer;
+    }
+    button:hover { border-color: var(--cyan-300); }
+    button:focus-visible { outline: 3px solid var(--focus); outline-offset: 3px; }
+    button:active { transform: translateY(1px) scale(.99); }
+    button:disabled {
+      cursor: not-allowed;
+      opacity: .45;
+      filter: saturate(.35);
+      transform: none;
+    }
+    #app, #game { position: fixed; inset: 0; }
+    #game { display: block; width: 100%; height: 100%; }
+    #overlay {
+      position: fixed;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      padding: 24px;
+      background:
+        linear-gradient(90deg, rgba(1, 8, 18, .96) 0%, rgba(1, 8, 18, .7) 43%, rgba(1, 8, 18, .18) 70%),
+        url("./assets/cover_art.png") center / cover no-repeat;
+      transition: opacity .25s ease;
+      z-index: 10;
+    }
+    #overlay[hidden] { display: none; }
+    .panel {
+      width: min(560px, 100%);
+      margin-right: min(42vw, 620px);
+      padding: clamp(22px, 4vw, 42px);
+      border-left: 3px solid var(--cyan-400);
+      background: linear-gradient(110deg, var(--glass), rgba(3, 15, 31, .42));
+      backdrop-filter: blur(12px);
+      box-shadow: 0 24px 80px rgba(0, 0, 0, .4);
+    }
+    .eyebrow {
+      margin: 0 0 9px;
+      color: var(--cyan-300);
+      font-size: 14px;
+      letter-spacing: .32em;
+      text-transform: uppercase;
+    }
+    h1 {
+      margin: 0;
+      color: var(--white);
+      font-size: clamp(36px, 6vw, 78px);
+      line-height: .9;
+      letter-spacing: -.05em;
+      text-transform: uppercase;
+      text-shadow: 0 5px 0 rgba(0, 0, 0, .45);
+    }
+    .subhead {
+      margin: 14px 0 0;
+      color: var(--cyan-400);
+      font-size: clamp(18px, 2vw, 28px);
+      letter-spacing: .08em;
+    }
+    #overlayMessage {
+      margin: 26px 0 8px;
+      color: rgba(244, 251, 255, .84);
+      line-height: 1.55;
+    }
+    #scoreSummary {
+      min-height: 28px;
+      margin: 10px 0 18px;
+      color: var(--orange-400);
+      font-size: 18px;
+      letter-spacing: .04em;
+    }
+    .actions { display: flex; flex-wrap: wrap; gap: 10px; }
+    .primary {
+      min-width: 190px;
+      padding: 14px 24px;
+      border-color: var(--cyan-300);
+      background: linear-gradient(180deg, var(--cyan-500), #08758a);
+      color: var(--ink-950);
+      font-weight: 800;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+    }
+    .secondary { padding: 14px 18px; }
+    #controlsHelp {
+      margin: 22px 0 0;
+      color: rgba(244, 251, 255, .62);
+      font-size: 13px;
+      line-height: 1.55;
+    }
+    #settingsPanel {
+      margin-top: 16px;
+      padding: 14px;
+      border: 1px solid rgba(142, 245, 255, .22);
+      background: rgba(2, 9, 22, .68);
+    }
+    #settingsPanel[hidden] { display: none; }
+    .setting {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      min-height: 38px;
+      color: rgba(244, 251, 255, .82);
+    }
+    .setting input { width: 20px; height: 20px; accent-color: var(--cyan-400); }
+    #hudButtons {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      z-index: 5;
+    }
+    .hud-button {
+      position: absolute;
+      pointer-events: auto;
+      border-radius: 999px;
+      width: 76px;
+      height: 76px;
+      padding: 7px;
+      font-size: 11px;
+      font-weight: 800;
+      text-transform: uppercase;
+      backdrop-filter: blur(9px);
+      -webkit-tap-highlight-color: transparent;
+    }
+    #missileBtn { right: 22px; bottom: calc(116px + var(--safe-bottom)); }
+    #boostBtn {
+      right: 108px;
+      bottom: calc(32px + var(--safe-bottom));
+      border-color: rgba(255, 138, 56, .72);
+    }
+    #boostBtn[data-ready="true"] {
+      border-color: var(--orange-400);
+      box-shadow: inset 0 0 24px rgba(255, 138, 56, .22), 0 0 30px rgba(255, 138, 56, .24);
+    }
+    #pauseBtn {
+      top: max(12px, env(safe-area-inset-top));
+      right: 12px;
+      width: 44px;
+      height: 44px;
+      pointer-events: auto;
+      border-radius: 10px;
+      font-size: 0;
+    }
+    #pauseBtn::before, #pauseBtn::after {
+      content: "";
+      position: absolute;
+      top: 12px;
+      width: 5px;
+      height: 18px;
+      background: var(--cyan-300);
+    }
+    #pauseBtn::before { left: 14px; }
+    #pauseBtn::after { right: 14px; }
+    #hudButtons[hidden] { display: none; }
+    #dev {
+      position: fixed;
+      top: 6px;
+      left: 6px;
+      z-index: 20;
+      display: none;
+      padding: 5px 7px;
+      background: rgba(0, 0, 0, .7);
+      color: #69ff77;
+      font: 12px/1.3 Consolas, monospace;
+      white-space: pre;
+      pointer-events: none;
+    }
+    #status {
+      position: fixed;
+      width: 1px;
+      height: 1px;
+      overflow: hidden;
+      clip: rect(0 0 0 0);
+      white-space: nowrap;
+    }
+    #game:focus-visible { outline: 2px solid var(--cyan-300); outline-offset: -3px; }
+    @media (pointer: fine) and (min-width: 900px) {
+      #missileBtn, #boostBtn { opacity: .18; }
+      #missileBtn:hover, #boostBtn:hover,
+      #missileBtn:focus-visible, #boostBtn:focus-visible { opacity: 1; }
+    }
+    @media (max-width: 900px), (orientation: portrait) {
+      #overlay {
+        align-items: end;
+        padding: 0;
+        background:
+          linear-gradient(0deg, rgba(1, 8, 18, .99) 0%, rgba(1, 8, 18, .83) 45%, rgba(1, 8, 18, .05) 78%),
+          url("./assets/cover_art.png") 66% center / cover no-repeat;
+      }
+      .panel {
+        width: 100%;
+        margin: 0;
+        padding: 25px 22px calc(22px + var(--safe-bottom));
+        border-left: 0;
+        border-top: 2px solid var(--cyan-400);
+      }
+      h1 { max-width: 10ch; }
+      #controlsHelp { display: none; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      #overlay { transition: none; }
+      button:active { transform: none; }
+    }
+  </style>
+</head>
+<body>
+  <main id="app">
+    <canvas id="game" aria-label="" tabindex="0"></canvas>
+    <div id="hudButtons" hidden>
+      <button id="missileBtn" class="hud-button" type="button"></button>
+      <button id="boostBtn" class="hud-button" type="button"></button>
+      <button id="pauseBtn" type="button"></button>
+    </div>
+    <section id="overlay" aria-labelledby="gameTitle">
+      <div class="panel">
+        <p id="eyebrow" class="eyebrow"></p>
+        <h1 id="gameTitle"></h1>
+        <p id="tagline" class="subhead"></p>
+        <p id="overlayMessage"></p>
+        <p id="scoreSummary" aria-live="polite"></p>
+        <div class="actions">
+          <button id="startBtn" class="primary" type="button"></button>
+          <button id="restartBtn" class="secondary" type="button" hidden></button>
+          <button id="settingsBtn" class="secondary" type="button" aria-expanded="false"></button>
+        </div>
+        <div id="settingsPanel" hidden>
+          <label class="setting"><input id="shakeToggle" type="checkbox"><span id="shakeLabel"></span></label>
+          <label class="setting"><input id="flashToggle" type="checkbox"><span id="flashLabel"></span></label>
+          <label class="setting"><input id="muteToggle" type="checkbox"><span id="muteLabel"></span></label>
+        </div>
+        <p id="controlsHelp"></p>
+      </div>
+    </section>
+    <div id="dev"></div>
+    <div id="status" role="status" aria-live="polite"></div>
+  </main>
+  <script type="module" src="./game.js"></script>
+</body>
+</html>

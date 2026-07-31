@@ -1,0 +1,11 @@
+{
+  "name": "blackwing-afterburn",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "node tools/build.mjs",
+    "dev": "npx serve public",
+    "start": "npx serve dist"
+  }
+}

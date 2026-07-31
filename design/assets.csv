@@ -1,0 +1,17 @@
+id,role,type,description,size/ratio,style line ref,source
+hero_jet,player aircraft rendered above all combat layers,static 2D sprite,titanium cyan hero jet,1:1 hero scale 1.0,style_formula_v1,generate
+enemy_scout,fast light enemy and formation filler,static 2D sprite,crimson needle scout jet,1:1 enemy scale 0.8,style_formula_v1,generate
+enemy_interceptor,aggressive flanking enemy with aimed shots,static 2D sprite,orange swept interceptor jet,1:1 enemy scale 1.0,style_formula_v1,generate
+enemy_bomber,slow armored enemy with radial attacks,static 2D sprite,crimson heavy bomber jet,1:1 enemy scale 1.35,style_formula_v1,generate
+boss_carrier,final multi-phase enemy centerpiece,static 2D sprite,armored crimson sky carrier,1:1 boss scale 3.4,style_formula_v1,generate
+explosion_burst,enemy destruction boss damage and player hit reaction,static 2D sprite,orange cyan explosion burst,1:1 effect scale 0.7-2.4,style_formula_v1,generate
+ocean_backdrop,full-height battlefield surface and atmospheric cloud layer,2D background,storm ocean cloud shadows,9:16 1024x1792,style_formula_v1,generate
+cover_art,public game thumbnail social card and start-screen cinematic backdrop,2D background,storm interception battlefield,16:9 1280x720,style_formula_v1,generate
+favicon_emblem,public catalog favicon set home-screen icon and in-game insignia,2D UI element,blackwing cyan wing emblem,1:1 square,style_formula_v1,generate
+combat_music,seamless main combat soundtrack,audio music loop,driving synthwave jet combat,30 second stereo loop,style_formula_v1,generate
+sfx_cannon,rapid automatic cannon acknowledgement,audio sound effect,punchy futuristic cannon burst,1 second stereo cue,style_formula_v1,generate
+sfx_missile,locked missile launch acknowledgement,audio sound effect,sharp guided missile launch,1 second stereo cue,style_formula_v1,generate
+sfx_explosion,enemy destruction and boss damage acknowledgement,audio sound effect,layered arcade jet explosion,2 second stereo cue,style_formula_v1,generate
+sfx_boost,player overdrive activation acknowledgement,audio sound effect,rising turbine energy surge,2 second stereo cue,style_formula_v1,generate
+sfx_warning,boss arrival and low health warning,audio sound effect,tactical radar warning pulse,2 second stereo cue,style_formula_v1,generate
+boss_stinger,boss arrival and victory accents,audio music stinger,ominous carrier arrival sting,8 second stereo,style_formula_v1,generate

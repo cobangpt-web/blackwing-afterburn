@@ -1,0 +1,11 @@
+node_modules/
+dist/
+.vercel/
+.DS_Store
+Thumbs.db
+*.zip
+output/
+deployment.json
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*

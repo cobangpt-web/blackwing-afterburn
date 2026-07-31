@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Blackwing jet emblem">
+  <defs>
+    <linearGradient id="metal" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#f4fbff"/>
+      <stop offset=".55" stop-color="#9bc9d6"/>
+      <stop offset="1" stop-color="#456879"/>
+    </linearGradient>
+  </defs>
+  <rect width="64" height="64" rx="14" fill="#020916"/>
+  <circle cx="32" cy="32" r="25" fill="none" stroke="#00cfe8" stroke-width="2.5"/>
+  <path d="M32 7 38 25 57 35 39 37 36 54 32 48 28 54 25 37 7 35 26 25Z" fill="url(#metal)" stroke="#31eaff" stroke-width="1.3" stroke-linejoin="round"/>
+  <path d="M32 12 34 34 32 44 30 34Z" fill="#061324"/>
+  <path d="M30 27h4l-1 6h-2Z" fill="#ff8a38"/>
+</svg>
