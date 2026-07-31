@@ -293,6 +293,107 @@
     #pauseBtn::before { left: 14px; }
     #pauseBtn::after { right: 14px; }
     #hudButtons[hidden] { display: none; }
+    #testToggle {
+      position: fixed;
+      top: max(12px, env(safe-area-inset-top));
+      left: 12px;
+      z-index: 31;
+      min-width: 74px;
+      min-height: 42px;
+      padding: 8px 12px;
+      border-color: var(--orange-400);
+      border-radius: 10px;
+      color: var(--orange-400);
+      font-size: 12px;
+      font-weight: 900;
+      letter-spacing: .12em;
+    }
+    #testToggle[hidden],
+    #testPanel[hidden] { display: none; }
+    #testPanel {
+      position: fixed;
+      top: max(64px, calc(env(safe-area-inset-top) + 58px));
+      left: 12px;
+      z-index: 30;
+      width: min(370px, calc(100vw - 24px));
+      padding: 18px;
+      border: 1px solid rgba(255, 138, 56, .72);
+      border-top: 3px solid var(--orange-400);
+      background: rgba(2, 9, 22, .96);
+      backdrop-filter: blur(14px);
+      box-shadow: 0 22px 70px rgba(0, 0, 0, .58);
+    }
+    .test-heading {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+    .test-heading strong {
+      color: var(--orange-400);
+      font-size: 15px;
+      letter-spacing: .15em;
+    }
+    .test-badge {
+      padding: 4px 7px;
+      border: 1px solid rgba(255, 138, 56, .46);
+      color: rgba(255, 196, 144, .86);
+      font-size: 10px;
+      letter-spacing: .08em;
+    }
+    #testDescription,
+    #testNotice {
+      margin: 10px 0 14px;
+      color: rgba(244, 251, 255, .68);
+      font-size: 12px;
+      line-height: 1.45;
+    }
+    #testStageButtons {
+      display: grid;
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+      gap: 6px;
+    }
+    .test-stage-button {
+      min-width: 0;
+      min-height: 48px;
+      padding: 6px 2px;
+      font-size: 12px;
+      font-weight: 800;
+    }
+    .test-stage-button[aria-pressed="true"] {
+      border-color: var(--orange-400);
+      background: linear-gradient(180deg, #d86624, #79300e);
+    }
+    .test-actions {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 7px;
+      margin-top: 10px;
+    }
+    .test-actions button {
+      min-height: 44px;
+      padding: 8px 10px;
+      font-size: 12px;
+      font-weight: 750;
+    }
+    .test-actions button:last-child { grid-column: 1 / -1; }
+    .test-invincible {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      min-height: 42px;
+      margin-top: 10px;
+      padding: 0 11px;
+      border: 1px solid rgba(142, 245, 255, .22);
+      color: var(--cyan-300);
+      font-size: 13px;
+      font-weight: 700;
+    }
+    .test-invincible input {
+      width: 22px;
+      height: 22px;
+      accent-color: var(--orange-400);
+    }
     #dev {
       position: fixed;
       top: 6px;
@@ -359,6 +460,10 @@
       }
       .upgrade-name { margin-top: 0; }
       .upgrade-description { margin-top: 6px; }
+      #testPanel {
+        max-height: calc(100dvh - 78px - var(--safe-bottom));
+        overflow-y: auto;
+      }
     }
     @media (prefers-reduced-motion: reduce) {
       #overlay { transition: none; }
@@ -369,6 +474,25 @@
 <body>
   <main id="app">
     <canvas id="game" aria-label="" tabindex="0"></canvas>
+    <button id="testToggle" type="button" aria-controls="testPanel" aria-expanded="true" hidden>TEST</button>
+    <aside id="testPanel" aria-labelledby="testTitle" hidden>
+      <div class="test-heading">
+        <strong id="testTitle"></strong>
+        <span class="test-badge">PRIVATE LINK</span>
+      </div>
+      <p id="testDescription"></p>
+      <div id="testStageButtons" role="group"></div>
+      <div class="test-actions">
+        <button id="testBossBtn" type="button"></button>
+        <button id="testDefeatBossBtn" type="button"></button>
+        <button id="testMaxCoresBtn" type="button"></button>
+      </div>
+      <label class="test-invincible">
+        <span id="testInvincibleLabel"></span>
+        <input id="testInvincibleToggle" type="checkbox" checked>
+      </label>
+      <p id="testNotice"></p>
+    </aside>
     <div id="hudButtons" hidden>
       <button id="missileBtn" class="hud-button" type="button"></button>
       <button id="boostBtn" class="hud-button" type="button"></button>

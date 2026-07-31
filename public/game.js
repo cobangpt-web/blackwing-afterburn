@@ -15,8 +15,11 @@ const WORLD_H = 1280;
 const STEP_MS = 1000 / 60;
 const DT = 1 / 60;
 const DPR_CAP = 1.5;
-const QUICK = new URLSearchParams(location.search).has("quick");
-const DEV = new URLSearchParams(location.search).has("dev");
+const QUERY = new URLSearchParams(location.search);
+const QUICK = QUERY.has("quick");
+const DEV = QUERY.has("dev");
+const TEST_MODE = QUERY.has("test");
+const INITIAL_TEST_STAGE = Math.max(0, Math.min(STAGES.length - 1, Number(QUERY.get("stage") || 1) - 1));
 const MAX_ENEMIES = 48;
 const MAX_SHOTS = 220;
 const MAX_MISSILES = 12;
@@ -24,6 +27,13 @@ const MAX_PICKUPS = 24;
 const MAX_EFFECTS = 24;
 const LOCK_DASH = [8, 9];
 const EMPTY_DASH = [];
+const TEST_BUILDS = [
+  {},
+  { twinWing: 1 },
+  { twinWing: 1, homing: 1, armor: 1 },
+  { spread: 1, railgun: 1, shield: 1, overdrive: 1 },
+  { twinWing: 2, railgun: 1, wingman: 2, emp: 1, shield: 1, overdrive: 1 },
+];
 
 const canvas = document.querySelector("#game");
 const ctx = canvas.getContext("2d", { alpha: false, desynchronized: true });
@@ -48,6 +58,17 @@ const upgradeEyebrow = document.querySelector("#upgradeEyebrow");
 const upgradeTitle = document.querySelector("#upgradeTitle");
 const upgradeHint = document.querySelector("#upgradeHint");
 const upgradeChoices = document.querySelector("#upgradeChoices");
+const testToggleBtn = document.querySelector("#testToggle");
+const testPanel = document.querySelector("#testPanel");
+const testStageButtonsRoot = document.querySelector("#testStageButtons");
+const testBossBtn = document.querySelector("#testBossBtn");
+const testDefeatBossBtn = document.querySelector("#testDefeatBossBtn");
+const testMaxCoresBtn = document.querySelector("#testMaxCoresBtn");
+const testInvincibleToggle = document.querySelector("#testInvincibleToggle");
+const testNotice = document.querySelector("#testNotice");
+const testStageButtons = [];
+let testInvincible = TEST_MODE;
+let lastTestControlsKey = "";
 
 document.documentElement.lang = (navigator.language || "en").toLowerCase().startsWith("ko") ? "ko" : "en";
 document.title = STR.title;
@@ -71,6 +92,50 @@ restartBtn.textContent = STR.restart;
 upgradeEyebrow.textContent = STR.stageClear;
 upgradeTitle.textContent = STR.chooseUpgrade;
 upgradeHint.textContent = STR.chooseUpgradeHint;
+document.querySelector("#testTitle").textContent = STR.testMode;
+document.querySelector("#testDescription").textContent = STR.testDescription;
+document.querySelector("#testInvincibleLabel").textContent = STR.testInvincible;
+testBossBtn.textContent = STR.testBoss;
+testDefeatBossBtn.textContent = STR.testDefeatBoss;
+testMaxCoresBtn.textContent = STR.testMaxCores;
+testNotice.textContent = STR.testOnly;
+testToggleBtn.setAttribute("aria-label", STR.testClose);
+testInvincibleToggle.checked = testInvincible;
+
+if (TEST_MODE) {
+  testToggleBtn.hidden = false;
+  testPanel.hidden = false;
+  for (let index = 0; index < STAGES.length; index += 1) {
+    const stage = STAGES[index];
+    const button = document.createElement("button");
+    button.className = "test-stage-button";
+    button.type = "button";
+    button.textContent = String(index + 1);
+    button.title = STR[stage.nameKey];
+    button.setAttribute("aria-label", `${STR.stage} ${index + 1}: ${STR[stage.nameKey]}`);
+    button.setAttribute("aria-pressed", "false");
+    button.disabled = true;
+    button.addEventListener("click", () => jumpToTestStage(index));
+    testStageButtonsRoot.append(button);
+    testStageButtons.push(button);
+  }
+} else {
+  testInvincibleToggle.checked = false;
+}
+
+testToggleBtn.addEventListener("click", () => {
+  const open = testPanel.hidden;
+  testPanel.hidden = !open;
+  testToggleBtn.setAttribute("aria-expanded", String(open));
+  testToggleBtn.setAttribute("aria-label", open ? STR.testClose : STR.testOpen);
+});
+testBossBtn.addEventListener("click", showTestBoss);
+testDefeatBossBtn.addEventListener("click", defeatTestBoss);
+testMaxCoresBtn.addEventListener("click", maxTestCores);
+testInvincibleToggle.addEventListener("change", () => {
+  testInvincible = testInvincibleToggle.checked;
+  syncTestControls(true);
+});
 
 const settings = {
   reduceShake: localStorage.getItem("bw-reduce-shake") === "1" || matchMedia("(prefers-reduced-motion: reduce)").matches,
@@ -206,6 +271,7 @@ async function loadAssets() {
   startBtn.disabled = false;
   startBtn.textContent = assetFailure ? STR.retry : STR.start;
   overlayMessage.textContent = assetFailure ? STR.loadError : STR.objective;
+  syncTestControls(true);
 }
 
 class AudioEngine {
@@ -872,6 +938,105 @@ function beginStage(index, newRun = false) {
   overlay.hidden = true;
   hudButtons.hidden = false;
   syncActionButtons(true);
+  syncTestControls(true);
+  canvas.focus();
+}
+
+function applyTestBuild(index) {
+  const levels = createItemLevels();
+  for (const [itemId, level] of Object.entries(TEST_BUILDS[index] || {})) {
+    levels[itemId] = level;
+  }
+  state.itemLevels = levels;
+  state.itemStats = getItemStats(levels);
+}
+
+function syncTestControls(force = false) {
+  if (!TEST_MODE) return;
+  const bossActive = Boolean(state.boss?.active);
+  const controlsKey = `${assetsReady}:${assetFailure}:${state.mode}:${state.stageIndex}:${bossActive}:${testInvincible}`;
+  if (!force && controlsKey === lastTestControlsKey) return;
+  lastTestControlsKey = controlsKey;
+  const usable = assetsReady && !assetFailure;
+  for (let index = 0; index < testStageButtons.length; index += 1) {
+    const button = testStageButtons[index];
+    button.disabled = !usable;
+    button.setAttribute("aria-pressed", String(index === state.stageIndex));
+  }
+  testBossBtn.disabled = !usable;
+  testDefeatBossBtn.disabled = !usable || !bossActive;
+  testMaxCoresBtn.disabled = !usable;
+  testInvincibleToggle.checked = testInvincible;
+}
+
+function jumpToTestStage(index, initializeAudio = true) {
+  if (!TEST_MODE || !assetsReady || assetFailure) return;
+  const safeIndex = Math.max(0, Math.min(STAGES.length - 1, index));
+  resetGame();
+  if (initializeAudio) audio.init();
+  applyTestBuild(safeIndex);
+  beginStage(safeIndex, true);
+  player.overdrive = 100;
+  player.missileCharges = 3;
+  state.intro = 0.7;
+  const stage = getStage(safeIndex);
+  testNotice.textContent = `${STR.testStageReady}: ${STR.stage} ${safeIndex + 1} · ${STR[stage.nameKey]}`;
+  syncActionButtons(true);
+  syncTestControls(true);
+}
+
+function showTestBoss() {
+  if (!TEST_MODE || !assetsReady || assetFailure) return;
+  if (state.mode !== "running") jumpToTestStage(state.stageIndex);
+  clearPool(enemies);
+  clearPool(shots);
+  clearPool(missiles);
+  clearPool(pickups);
+  clearPool(effects);
+  state.bossSpawned = false;
+  state.boss = null;
+  state.pendingVictory = false;
+  state.victoryDelay = 0;
+  state.mode = "running";
+  upgradePanel.hidden = true;
+  overlay.hidden = true;
+  hudButtons.hidden = false;
+  state.stageTime = getBossTime(state.stageIndex, QUICK);
+  spawnBoss();
+  if (state.boss) state.boss.y = 180;
+  state.intro = 0;
+  player.invulnerable = Math.max(player.invulnerable, 1.5);
+  testNotice.textContent = `${STR.testBossReady}: ${STR[getStage(state.stageIndex).bossKey]}`;
+  syncActionButtons(true);
+  syncTestControls(true);
+  canvas.focus();
+}
+
+function defeatTestBoss() {
+  if (!TEST_MODE || !assetsReady || assetFailure) return;
+  if (!state.boss?.active) showTestBoss();
+  if (state.boss?.active) {
+    state.boss.hp = 0;
+    defeatEnemy(state.boss);
+    testNotice.textContent = STR.testDefeatBoss;
+  }
+  syncTestControls(true);
+}
+
+function maxTestCores() {
+  if (!TEST_MODE || !assetsReady || assetFailure) return;
+  if (state.mode !== "running") jumpToTestStage(state.stageIndex);
+  const levels = createItemLevels();
+  for (const itemId of Object.keys(levels)) levels[itemId] = 3;
+  state.itemLevels = levels;
+  state.itemStats = getItemStats(levels);
+  player.hp = state.itemStats.maxHp;
+  player.shield = state.itemStats.maxShield;
+  player.overdrive = 100;
+  player.missileCharges = 3;
+  testNotice.textContent = STR.testMaxCores;
+  syncActionButtons(true);
+  syncTestControls(true);
   canvas.focus();
 }
 
@@ -917,6 +1082,7 @@ function showUpgradePanel() {
   }
   upgradePanel.hidden = false;
   statusLive.textContent = STR.chooseUpgrade;
+  syncTestControls(true);
   upgradeChoices.querySelector("button")?.focus();
 }
 
@@ -945,7 +1111,6 @@ function resetGame() {
   settingsBtn.setAttribute("aria-expanded", "false");
   settingsBtn.setAttribute("aria-label", STR.accessibilityOpen);
   scoreSummary.textContent = "";
-  audio.init();
 }
 
 function endGame(victory) {
@@ -956,7 +1121,7 @@ function endGame(victory) {
   state.mode = victory ? "victory" : "defeat";
   state.victory = victory;
   const oldBest = state.best;
-  if (state.score > state.best) {
+  if (!TEST_MODE && state.score > state.best) {
     state.best = state.score;
     localStorage.setItem("bw-best", String(state.best));
   }
@@ -967,10 +1132,12 @@ function endGame(victory) {
   document.querySelector("#eyebrow").textContent = victory ? STR.victory : STR.defeat;
   overlayMessage.textContent = victory ? STR.victorySummary : STR.defeatSummary;
   statusLive.textContent = victory ? STR.victorySummary : STR.defeatSummary;
-  const record = state.best > oldBest ? ` · ${STR.newBest}` : "";
-  scoreSummary.textContent = `${STR.finalScore}: ${Math.round(state.score).toLocaleString()} · ${STR.bestScore}: ${Math.round(state.best).toLocaleString()}${record}`;
+  const record = !TEST_MODE && state.best > oldBest ? ` · ${STR.newBest}` : "";
+  const testSuffix = TEST_MODE ? ` · ${STR.testOnly}` : "";
+  scoreSummary.textContent = `${STR.finalScore}: ${Math.round(state.score).toLocaleString()} · ${STR.bestScore}: ${Math.round(state.best).toLocaleString()}${record}${testSuffix}`;
   startBtn.textContent = STR.restart;
   syncActionButtons(true);
+  syncTestControls(true);
   startBtn.focus();
 }
 
@@ -1115,6 +1282,7 @@ function activateOverdrive() {
 }
 
 function damagePlayer(amount) {
+  if (TEST_MODE && testInvincible) return;
   if (player.invulnerable > 0 || player.overdriveTime > 0 || state.mode !== "running") return;
   if (player.shield > 0) {
     player.shield -= 1;
@@ -1160,6 +1328,7 @@ function defeatEnemy(enemy) {
     state.flash = settings.reduceFlash ? 0.09 : 0.45;
     state.pendingVictory = true;
     state.victoryDelay = 0.9;
+    syncTestControls(true);
   }
 }
 
@@ -1982,6 +2151,8 @@ function debugSnapshot() {
     bossActive: Boolean(state.boss?.active),
     bossHp: state.boss?.active ? Math.round(state.boss.hp) : 0,
     pendingVictory: state.pendingVictory,
+    testMode: TEST_MODE,
+    testInvincible: TEST_MODE && testInvincible,
     items: { ...state.itemLevels },
     kills: state.kills,
     activeEnemies,
@@ -2028,6 +2199,29 @@ window.__BLACKWING__ = {
     if (state.mode === "upgrade" && ITEMS[itemId]) equipUpgrade(itemId);
     return debugSnapshot();
   },
+  jumpStage(stage = 1) {
+    jumpToTestStage(Math.max(0, Math.min(STAGES.length - 1, Number(stage) - 1)));
+    return debugSnapshot();
+  },
+  showTestBoss() {
+    showTestBoss();
+    return debugSnapshot();
+  },
+  defeatTestBoss() {
+    defeatTestBoss();
+    return debugSnapshot();
+  },
+  maxCores() {
+    maxTestCores();
+    return debugSnapshot();
+  },
+  setTestInvincible(value = true) {
+    if (TEST_MODE) {
+      testInvincible = Boolean(value);
+      syncTestControls(true);
+    }
+    return debugSnapshot();
+  },
   simulate(ticks = 60) {
     const wasVisibilityPaused = pausedByVisibility;
     pausedByVisibility = true;
@@ -2043,5 +2237,10 @@ window.__BLACKWING__ = {
 overlayMessage.textContent = STR.loading;
 startBtn.textContent = STR.loading;
 syncActionButtons(true);
-loadAssets();
+loadAssets().then(() => {
+  if (TEST_MODE && !assetFailure && QUERY.has("stage")) {
+    jumpToTestStage(INITIAL_TEST_STAGE, false);
+    if (QUERY.has("boss")) showTestBoss();
+  }
+});
 requestAnimationFrame(frame);

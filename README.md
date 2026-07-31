@@ -21,6 +21,16 @@ Live: https://blackwing-afterburn.vercel.app/
 4. Frozen Stratosphere — Boreas Weather Engine
 5. Black Sky — Erebus Black Crown
 
+## Test mode
+
+Open https://blackwing-afterburn.vercel.app/?test=1 to use the private campaign test panel.
+
+- Jump directly to any of the five stages with a recommended stage build.
+- Reveal or instantly defeat the current boss.
+- Toggle invincibility and max every combat core.
+- Open a specific boss directly with `?test=1&stage=5&boss=1`.
+- Test scores never replace the normal high score.
+
 ## Develop
 
 ```sh
