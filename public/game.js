@@ -9,6 +9,7 @@ import {
   getStage,
   getUpgradeChoices,
 } from "./campaign.js";
+import { calculateJoystickVector } from "./joystick.js";
 import { drawLowerFieldShade, drawUpperFieldTint } from "./rendering.js";
 import { createViewportLayout, getTouchLeadWorld } from "./viewport.js";
 
@@ -55,6 +56,7 @@ const shakeToggle = document.querySelector("#shakeToggle");
 const flashToggle = document.querySelector("#flashToggle");
 const muteToggle = document.querySelector("#muteToggle");
 const hudButtons = document.querySelector("#hudButtons");
+const moveStick = document.querySelector("#moveStick");
 const missileBtn = document.querySelector("#missileBtn");
 const boostBtn = document.querySelector("#boostBtn");
 const pauseBtn = document.querySelector("#pauseBtn");
@@ -93,6 +95,7 @@ boostBtn.setAttribute("aria-label", STR.boostButton);
 pauseBtn.setAttribute("aria-label", STR.pauseButton);
 document.querySelector("#controlsHelp").textContent =
   `${STR.controlsKeyboard} · ${STR.controlsTouch} · ${STR.controlsPad}`;
+moveStick.setAttribute("aria-label", STR.moveStick);
 settingsBtn.textContent = STR.settings;
 settingsBtn.setAttribute("aria-label", STR.accessibilityOpen);
 restartBtn.textContent = STR.restart;
@@ -499,6 +502,9 @@ const input = {
   pauseEdge: false,
   pointer: false,
   pointerTouch: false,
+  stickActive: false,
+  stickX: 0,
+  stickY: 0,
   targetX: WORLD_W * 0.5,
   targetY: WORLD_H * 0.82,
   injectedMissile: false,
@@ -507,6 +513,17 @@ const input = {
 
 let activePointerId = null;
 let activeTouchLead = 0;
+let activeStickPointerId = null;
+
+function resetMoveStick() {
+  input.stickActive = false;
+  input.stickX = 0;
+  input.stickY = 0;
+  activeStickPointerId = null;
+  moveStick.dataset.active = "false";
+  moveStick.style.setProperty("--stick-x", "0px");
+  moveStick.style.setProperty("--stick-y", "0px");
+}
 
 function releaseTransientInput() {
   input.up = false;
@@ -522,6 +539,7 @@ function releaseTransientInput() {
   input.injectedBoost = false;
   activePointerId = null;
   activeTouchLead = 0;
+  resetMoveStick();
   padX = 0;
   padY = 0;
 }
@@ -566,6 +584,10 @@ function pointerIsTouch(event) {
   return event.pointerType === "touch" || (event.pointerType === "" && isCoarsePointer());
 }
 
+function useMoveStickForTouch() {
+  return viewportMode === "portrait-cover" && isCoarsePointer();
+}
+
 function clientToWorld(event) {
   return {
     x: (event.clientX - viewX) / viewScale,
@@ -579,6 +601,10 @@ function pointerToWorld(event) {
   input.targetY = Math.max(0, Math.min(WORLD_H, point.y - activeTouchLead));
 }
 canvas.addEventListener("pointerdown", (event) => {
+  if (pointerIsTouch(event) && useMoveStickForTouch()) {
+    event.preventDefault();
+    return;
+  }
   if (activePointerId !== null) return;
   activePointerId = event.pointerId;
   input.pointer = true;
@@ -603,6 +629,50 @@ canvas.addEventListener("pointerup", (event) => {
   event.preventDefault();
 });
 canvas.addEventListener("pointercancel", releaseTransientInput);
+function updateMoveStick(event) {
+  const rect = moveStick.getBoundingClientRect();
+  const vector = calculateJoystickVector({
+    clientX: event.clientX,
+    clientY: event.clientY,
+    centerX: rect.left + rect.width * 0.5,
+    centerY: rect.top + rect.height * 0.5,
+    radius: rect.width * 0.34,
+  });
+  input.stickX = vector.inputX;
+  input.stickY = vector.inputY;
+  moveStick.style.setProperty("--stick-x", `${vector.knobX.toFixed(1)}px`);
+  moveStick.style.setProperty("--stick-y", `${vector.knobY.toFixed(1)}px`);
+}
+
+moveStick.addEventListener("pointerdown", (event) => {
+  if (activeStickPointerId !== null) return;
+  activeStickPointerId = event.pointerId;
+  input.pointer = false;
+  input.pointerTouch = false;
+  activePointerId = null;
+  activeTouchLead = 0;
+  input.stickActive = true;
+  moveStick.dataset.active = "true";
+  updateMoveStick(event);
+  moveStick.setPointerCapture(event.pointerId);
+  event.stopPropagation();
+  event.preventDefault();
+});
+moveStick.addEventListener("pointermove", (event) => {
+  if (event.pointerId !== activeStickPointerId) return;
+  updateMoveStick(event);
+  event.stopPropagation();
+  event.preventDefault();
+});
+function releaseMoveStick(event) {
+  if (event.pointerId !== activeStickPointerId) return;
+  if (moveStick.hasPointerCapture(event.pointerId)) moveStick.releasePointerCapture(event.pointerId);
+  resetMoveStick();
+  event.stopPropagation();
+  event.preventDefault();
+}
+moveStick.addEventListener("pointerup", releaseMoveStick);
+moveStick.addEventListener("pointercancel", releaseMoveStick);
 missileBtn.addEventListener("pointerdown", (event) => {
   input.missileEdge = true;
   event.stopPropagation();
@@ -1386,8 +1456,8 @@ function defeatEnemy(enemy) {
 }
 
 function updatePlayer() {
-  let mx = (input.right ? 1 : 0) - (input.left ? 1 : 0) + padX;
-  let my = (input.down ? 1 : 0) - (input.up ? 1 : 0) + padY;
+  let mx = (input.right ? 1 : 0) - (input.left ? 1 : 0) + padX + input.stickX;
+  let my = (input.down ? 1 : 0) - (input.up ? 1 : 0) + padY + input.stickY;
   if (input.pointer) {
     const dx = input.targetX - player.x;
     const dy = input.targetY - player.y;
@@ -1400,10 +1470,11 @@ function updatePlayer() {
     mx /= length;
     my /= length;
   }
-  const speed = player.overdriveTime > 0 ? 620 : input.pointerTouch ? TOUCH_SPEED : DEFAULT_SPEED;
+  const touchMoveActive = input.pointerTouch || input.stickActive;
+  const speed = player.overdriveTime > 0 ? 620 : touchMoveActive ? TOUCH_SPEED : DEFAULT_SPEED;
   const targetVx = mx * speed;
   const targetVy = my * speed;
-  const response = input.pointerTouch ? 0.32 : 0.24;
+  const response = touchMoveActive ? 0.32 : 0.24;
   player.vx += (targetVx - player.vx) * response;
   player.vy += (targetVy - player.vy) * response;
   player.x = Math.max(54, Math.min(WORLD_W - 54, player.x + player.vx * DT));
@@ -2272,6 +2343,11 @@ function debugSnapshot() {
     kills: state.kills,
     activeEnemies,
     activeShots,
+    stick: {
+      active: input.stickActive,
+      x: Number(input.stickX.toFixed(3)),
+      y: Number(input.stickY.toFixed(3)),
+    },
     viewport: {
       mode: viewportMode,
       scale: Number(viewScale.toFixed(3)),
