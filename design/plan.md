@@ -7,7 +7,7 @@ The player feels like an untouchable ace because the game constantly turns dange
 ## Profile
 
 - Real-time, continuous 2D, solo play against authored and seeded procedural waves.
-- A complete run lasts roughly two to three minutes and ends in victory or defeat.
+- A complete five-stage run lasts roughly five to eight minutes and ends in victory or defeat.
 - Execution and pattern mastery are the primary engagement sources.
 - Delivery targets desktop and mobile browsers plus standard gamepads.
 - Player-visible language is isolated in `public/strings.js`.
@@ -22,11 +22,13 @@ The player feels like an untouchable ace because the game constantly turns dange
 
 ## Combat arc
 
-1. Launch: light scouts teach movement and auto-fire.
-2. Intercept: aimed interceptors make lateral repositioning matter.
-3. Break: armored bombers introduce radial attacks and missile prioritization.
-4. Burn: mixed formations test target choice while close dodges fill overdrive.
-5. Carrier: a multi-pattern boss combines aimed spreads, radial bursts, and weak-point windows.
+1. Tempest Sea: light formations lead into the Varka sky carrier.
+2. Red Canyon: denser ground-fire pressure leads into the Moloch siege dreadnought.
+3. Neon Blockade: fast lateral attacks lead into the Phantom stealth bomber.
+4. Frozen Stratosphere: spiral projectile fields lead into the Boreas weather engine.
+5. Black Sky: the full enemy roster leads into the Erebus orbital fortress.
+
+After stages one through four, the player chooses one of three weighted combat cores. Cores persist through the run and stack to level three across weapon, subweapon, defense, and engine categories.
 
 ## Resources and feedback
 
@@ -42,4 +44,4 @@ Polished arcade illustration with crisp cel-shaded gradients and subtle metallic
 
 ## Reference play route
 
-Start the sortie, destroy the first scout formation, use one missile volley on the interceptor pair, activate overdrive during the first bomber wave, survive until the carrier arrives, destroy it, and restart from the result screen.
+Start the sortie, clear the Tempest Sea, choose a combat core, carry that build through the next three sectors, destroy Erebus in Black Sky, and restart from the campaign result screen.

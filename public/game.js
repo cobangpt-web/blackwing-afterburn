@@ -1,4 +1,14 @@
 import { STR } from "./strings.js";
+import {
+  ITEMS,
+  STAGES,
+  applyItemLevel,
+  createItemLevels,
+  getBossTime,
+  getItemStats,
+  getStage,
+  getUpgradeChoices,
+} from "./campaign.js";
 
 const WORLD_W = 720;
 const WORLD_H = 1280;
@@ -33,6 +43,11 @@ const boostBtn = document.querySelector("#boostBtn");
 const pauseBtn = document.querySelector("#pauseBtn");
 const devPanel = document.querySelector("#dev");
 const statusLive = document.querySelector("#status");
+const upgradePanel = document.querySelector("#upgradePanel");
+const upgradeEyebrow = document.querySelector("#upgradeEyebrow");
+const upgradeTitle = document.querySelector("#upgradeTitle");
+const upgradeHint = document.querySelector("#upgradeHint");
+const upgradeChoices = document.querySelector("#upgradeChoices");
 
 document.documentElement.lang = (navigator.language || "en").toLowerCase().startsWith("ko") ? "ko" : "en";
 document.title = STR.title;
@@ -53,6 +68,9 @@ document.querySelector("#controlsHelp").textContent =
 settingsBtn.textContent = STR.settings;
 settingsBtn.setAttribute("aria-label", STR.accessibilityOpen);
 restartBtn.textContent = STR.restart;
+upgradeEyebrow.textContent = STR.stageClear;
+upgradeTitle.textContent = STR.chooseUpgrade;
+upgradeHint.textContent = STR.chooseUpgradeHint;
 
 const settings = {
   reduceShake: localStorage.getItem("bw-reduce-shake") === "1" || matchMedia("(prefers-reduced-motion: reduce)").matches,
@@ -119,8 +137,16 @@ const manifestAssets = {
   enemy_interceptor: "./assets/enemy_interceptor.png",
   enemy_bomber: "./assets/enemy_bomber.png",
   boss_carrier: "./assets/boss_carrier.png",
+  boss_moloch: "./assets/boss_moloch.png",
+  boss_phantom: "./assets/boss_phantom.png",
+  boss_boreas: "./assets/boss_boreas.png",
+  boss_erebus: "./assets/boss_erebus.png",
   explosion_burst: "./assets/explosion_burst.png",
   ocean_backdrop: "./assets/ocean_backdrop.png",
+  canyon_backdrop: "./assets/canyon_backdrop.png",
+  neon_backdrop: "./assets/neon_backdrop.png",
+  boreal_backdrop: "./assets/boreal_backdrop.png",
+  erebus_backdrop: "./assets/erebus_backdrop.png",
   cover_art: "./assets/cover_art.png",
   favicon_emblem: "./assets/favicon_emblem.png",
 };
@@ -138,9 +164,17 @@ const imageSources = {
   scout: manifestAssets.enemy_scout,
   interceptor: manifestAssets.enemy_interceptor,
   bomber: manifestAssets.enemy_bomber,
-  boss: manifestAssets.boss_carrier,
+  bossCarrier: manifestAssets.boss_carrier,
+  bossMoloch: manifestAssets.boss_moloch,
+  bossPhantom: manifestAssets.boss_phantom,
+  bossBoreas: manifestAssets.boss_boreas,
+  bossErebus: manifestAssets.boss_erebus,
   explosion: manifestAssets.explosion_burst,
-  background: manifestAssets.ocean_backdrop,
+  backgroundTempest: manifestAssets.ocean_backdrop,
+  backgroundCanyon: manifestAssets.canyon_backdrop,
+  backgroundNeon: manifestAssets.neon_backdrop,
+  backgroundBoreal: manifestAssets.boreal_backdrop,
+  backgroundErebus: manifestAssets.erebus_backdrop,
   emblem: manifestAssets.favicon_emblem,
 };
 const images = {};
@@ -509,7 +543,7 @@ function makeEnemy() {
 function makeShot() {
   return {
     active: false, team: 0, x: 0, y: 0, px: 0, py: 0, vx: 0, vy: 0,
-    radius: 4, damage: 0, life: 0, grazed: false,
+    radius: 4, damage: 0, life: 0, grazed: false, pierce: 0, lastHit: null,
   };
 }
 function makeMissile() {
@@ -527,7 +561,7 @@ const shots = Array.from({ length: MAX_SHOTS }, makeShot);
 const missiles = Array.from({ length: MAX_MISSILES }, makeMissile);
 const pickups = Array.from({ length: MAX_PICKUPS }, makePickup);
 const effects = Array.from({ length: MAX_EFFECTS }, makeEffect);
-const lockTargets = [null, null, null, null];
+const lockTargets = Array.from({ length: 7 }, () => null);
 const player = {
   x: WORLD_W * 0.5,
   y: WORLD_H * 0.84,
@@ -542,11 +576,14 @@ const player = {
   missileCharges: 3,
   missileRecharge: 0,
   bank: 0,
+  shield: 0,
 };
 const state = {
   mode: "start",
   seed: 0x13a7c0de,
   time: 0,
+  stageTime: 0,
+  stageIndex: 0,
   intro: 0,
   score: 0,
   best: Number(localStorage.getItem("bw-best") || 0),
@@ -566,6 +603,8 @@ const state = {
   bossStingerDelay: 0,
   pendingVictory: false,
   victoryDelay: 0,
+  itemLevels: createItemLevels(),
+  itemStats: getItemStats(createItemLevels()),
 };
 
 let lastMissileButtonKey = "";
@@ -615,6 +654,8 @@ function clearPool(pool) {
 }
 
 function spawnEnemy(type, x, y, phase = 0) {
+  const stage = getStage(state.stageIndex);
+  const hpScale = stage.difficulty;
   for (let i = 0; i < enemies.length; i += 1) {
     const enemy = enemies[i];
     if (enemy.active) continue;
@@ -631,21 +672,21 @@ function spawnEnemy(type, x, y, phase = 0) {
     enemy.summon = 6.5;
     enemy.hitFlash = 0;
     if (type === 0) {
-      enemy.hp = enemy.maxHp = 12;
+      enemy.hp = enemy.maxHp = Math.round(12 * hpScale);
       enemy.radius = 24;
-      enemy.score = 150;
+      enemy.score = Math.round(150 * hpScale);
     } else if (type === 1) {
-      enemy.hp = enemy.maxHp = 26;
+      enemy.hp = enemy.maxHp = Math.round(26 * hpScale);
       enemy.radius = 29;
-      enemy.score = 320;
+      enemy.score = Math.round(320 * hpScale);
     } else if (type === 2) {
-      enemy.hp = enemy.maxHp = 68;
+      enemy.hp = enemy.maxHp = Math.round(68 * hpScale);
       enemy.radius = 42;
-      enemy.score = 720;
+      enemy.score = Math.round(720 * hpScale);
     } else {
-      enemy.hp = enemy.maxHp = QUICK ? 420 : 1280;
+      enemy.hp = enemy.maxHp = QUICK ? Math.round(stage.bossHp * 0.34) : stage.bossHp;
       enemy.radius = 112;
-      enemy.score = 12000;
+      enemy.score = Math.round(12000 * stage.difficulty);
       state.boss = enemy;
     }
     return enemy;
@@ -653,7 +694,7 @@ function spawnEnemy(type, x, y, phase = 0) {
   return null;
 }
 
-function spawnShot(team, x, y, vx, vy, radius, damage, life = 5) {
+function spawnShot(team, x, y, vx, vy, radius, damage, life = 5, pierce = 0) {
   for (let i = 0; i < shots.length; i += 1) {
     const shot = shots[i];
     if (shot.active) continue;
@@ -667,6 +708,8 @@ function spawnShot(team, x, y, vx, vy, radius, damage, life = 5) {
     shot.damage = damage;
     shot.life = life;
     shot.grazed = false;
+    shot.pierce = pierce;
+    shot.lastHit = null;
     return shot;
   }
   return null;
@@ -721,6 +764,14 @@ function shootAimed(enemy, speed = 215, spread = 0, damage = 10) {
   }
 }
 
+function shootFan(enemy, count, speed, spread, damage) {
+  const base = Math.atan2(player.y - enemy.y, player.x - enemy.x);
+  for (let index = 0; index < count; index += 1) {
+    const angle = base + (index - (count - 1) * 0.5) * spread;
+    spawnShot(2, enemy.x, enemy.y + enemy.radius * 0.42, Math.cos(angle) * speed, Math.sin(angle) * speed, 6, damage);
+  }
+}
+
 function shootRadial(enemy, count, speed, offset = 0, damage = 10) {
   for (let i = 0; i < count; i += 1) {
     const angle = offset + Math.PI * 2 * i / count;
@@ -736,76 +787,148 @@ function setBanner(text) {
 
 function spawnWave() {
   state.wave += 1;
-  const t = state.time;
-  if (t < (QUICK ? 8 : 28)) {
+  const t = state.stageTime;
+  const bossAt = getBossTime(state.stageIndex, QUICK);
+  const section = Math.min(3, Math.floor(t / bossAt * 4));
+  const extra = Math.floor(state.stageIndex / 2);
+  if (section === 0) {
     setBanner(STR.waveScout);
-    const count = 4 + Math.min(3, Math.floor(state.wave / 2));
+    const count = 4 + extra + Math.min(2, Math.floor(state.wave / 2));
     for (let i = 0; i < count; i += 1) {
       spawnEnemy(0, 105 + i * (510 / Math.max(1, count - 1)), -70 - Math.abs(i - count * 0.5) * 34, i * 0.7);
     }
-    state.nextWave = t + (QUICK ? 3.1 : 5.4);
-  } else if (t < (QUICK ? 17 : 58)) {
+  } else if (section === 1) {
     setBanner(STR.waveInterceptor);
     spawnEnemy(1, 130, -80, 0);
     spawnEnemy(1, 590, -120, Math.PI);
-    for (let i = 0; i < 3; i += 1) spawnEnemy(0, 275 + i * 85, -190 - i * 44, i);
-    state.nextWave = t + (QUICK ? 3.4 : 6.2);
-  } else if (t < (QUICK ? 27 : 88)) {
+    for (let i = 0; i < 3 + extra; i += 1) spawnEnemy(0, 250 + i * (220 / Math.max(1, 2 + extra)), -190 - i * 44, i);
+  } else if (section === 2) {
     setBanner(STR.waveBomber);
     spawnEnemy(2, 215 + rand() * 290, -120, rand() * 5);
-    for (let i = 0; i < 4; i += 1) spawnEnemy(i % 2, 90 + i * 175, -240 - i * 38, i);
-    state.nextWave = t + (QUICK ? 4.2 : 7.2);
+    if (state.stageIndex >= 3) spawnEnemy(2, 160 + rand() * 400, -260, rand() * 5);
+    for (let i = 0; i < 4 + extra; i += 1) spawnEnemy(i % 2, 80 + i * (560 / (3 + extra)), -240 - i * 38, i);
   } else {
     setBanner(STR.waveMixed);
     spawnEnemy(2, 360, -130, rand() * 5);
     spawnEnemy(1, 120, -210, 0);
     spawnEnemy(1, 600, -250, Math.PI);
-    for (let i = 0; i < 4; i += 1) spawnEnemy(0, 170 + i * 125, -340 - i * 30, i);
-    state.nextWave = t + (QUICK ? 4.8 : 8.2);
+    for (let i = 0; i < 4 + extra; i += 1) spawnEnemy(0, 120 + i * (480 / (3 + extra)), -340 - i * 30, i);
   }
+  state.nextWave = t + (QUICK ? 2.2 : 5.7 + section * 0.55 - state.stageIndex * 0.18);
 }
 
 function spawnBoss() {
   if (state.bossSpawned) return;
   state.bossSpawned = true;
-  const boss = spawnEnemy(3, WORLD_W * 0.5, -430, 0);
+  const stage = getStage(state.stageIndex);
+  const boss = spawnEnemy(3, WORLD_W * 0.5, -180, 0);
   state.boss = boss;
-  setBanner(STR.bossIncoming);
+  setBanner(`${STR.bossIncoming} · ${STR[stage.bossKey]}`);
   audio.warning();
   state.bossStingerDelay = 0.33;
   state.flash = settings.reduceFlash ? 0.08 : 0.34;
 }
 
-function resetGame() {
-  releaseTransientInput();
+function beginStage(index, newRun = false) {
   clearPool(enemies);
   clearPool(shots);
   clearPool(missiles);
   clearPool(pickups);
   clearPool(effects);
-  player.x = WORLD_W * 0.5;
-  player.y = WORLD_H * 0.84;
-  player.vx = 0;
-  player.vy = 0;
-  player.hp = 100;
-  player.fire = 0;
-  player.invulnerable = 1.2;
-  player.overdrive = 0;
-  player.overdriveTime = 0;
-  player.missileCharges = 3;
-  player.missileRecharge = 0;
-  player.bank = 0;
-  state.mode = "running";
-  state.seed = 0x13a7c0de;
-  state.time = 0;
-  state.intro = 1.55;
-  state.score = 0;
-  state.combo = 1;
-  state.comboTimer = 0;
+  state.stageIndex = index;
+  state.stageTime = 0;
   state.nextWave = 1.1;
   state.wave = 0;
   state.bossSpawned = false;
   state.boss = null;
+  state.bossStingerDelay = 0;
+  state.pendingVictory = false;
+  state.victoryDelay = 0;
+  state.mode = "running";
+  state.intro = 1.75;
+  player.x = WORLD_W * 0.5;
+  player.y = WORLD_H * 0.84;
+  player.vx = 0;
+  player.vy = 0;
+  player.fire = 0;
+  player.invulnerable = 1.5;
+  player.overdriveTime = 0;
+  player.missileRecharge = 0;
+  player.bank = 0;
+  if (newRun) {
+    player.hp = state.itemStats.maxHp;
+    player.overdrive = 0;
+    player.missileCharges = 3;
+  } else {
+    player.hp = Math.min(state.itemStats.maxHp, player.hp + Math.ceil(state.itemStats.maxHp * 0.24));
+    player.overdrive = Math.max(28, player.overdrive * 0.55);
+    player.missileCharges = Math.max(2, player.missileCharges);
+  }
+  player.shield = state.itemStats.maxShield;
+  const stage = getStage(index);
+  setBanner(`${STR.stage} ${index + 1} / ${STAGES.length} · ${STR[stage.nameKey]}`);
+  statusLive.textContent = `${STR.stage} ${index + 1}. ${STR[stage.nameKey]}`;
+  upgradePanel.hidden = true;
+  overlay.hidden = true;
+  hudButtons.hidden = false;
+  syncActionButtons(true);
+  canvas.focus();
+}
+
+function equipUpgrade(itemId) {
+  const previousStats = state.itemStats;
+  state.itemLevels = applyItemLevel(state.itemLevels, itemId);
+  state.itemStats = getItemStats(state.itemLevels);
+  player.hp = Math.min(state.itemStats.maxHp, player.hp + Math.max(0, state.itemStats.maxHp - previousStats.maxHp));
+  player.shield = state.itemStats.maxShield;
+  beginStage(state.stageIndex + 1);
+}
+
+function showUpgradePanel() {
+  state.mode = "upgrade";
+  clearPool(shots);
+  clearPool(missiles);
+  clearPool(pickups);
+  hudButtons.hidden = true;
+  upgradeChoices.replaceChildren();
+  const choices = getUpgradeChoices(state.stageIndex, state.itemLevels, rand);
+  for (const itemId of choices) {
+    const item = ITEMS[itemId];
+    const copy = STR.items[itemId];
+    const nextLevel = (state.itemLevels[itemId] || 0) + 1;
+    const button = document.createElement("button");
+    button.className = "upgrade-card";
+    button.type = "button";
+    const icon = document.createElement("span");
+    icon.className = "upgrade-icon";
+    icon.textContent = item.icon;
+    const name = document.createElement("span");
+    name.className = "upgrade-name";
+    name.textContent = copy.name;
+    const level = document.createElement("span");
+    level.className = "upgrade-level";
+    level.textContent = `${STR.itemLevel} ${nextLevel} / 3`;
+    const description = document.createElement("span");
+    description.className = "upgrade-description";
+    description.textContent = copy.description;
+    button.append(icon, name, level, description);
+    button.addEventListener("click", () => equipUpgrade(itemId), { once: true });
+    upgradeChoices.append(button);
+  }
+  upgradePanel.hidden = false;
+  statusLive.textContent = STR.chooseUpgrade;
+  upgradeChoices.querySelector("button")?.focus();
+}
+
+function resetGame() {
+  releaseTransientInput();
+  state.itemLevels = createItemLevels();
+  state.itemStats = getItemStats(state.itemLevels);
+  state.seed = 0x13a7c0de;
+  state.time = 0;
+  state.score = 0;
+  state.combo = 1;
+  state.comboTimer = 0;
   state.banner = "";
   state.bannerTime = 0;
   state.shake = 0;
@@ -816,15 +939,12 @@ function resetGame() {
   state.bossStingerDelay = 0;
   state.pendingVictory = false;
   state.victoryDelay = 0;
-  overlay.hidden = true;
-  hudButtons.hidden = false;
+  beginStage(0, true);
   restartBtn.hidden = true;
   settingsPanel.hidden = true;
   settingsBtn.setAttribute("aria-expanded", "false");
   settingsBtn.setAttribute("aria-label", STR.accessibilityOpen);
   scoreSummary.textContent = "";
-  syncActionButtons(true);
-  canvas.focus();
   audio.init();
 }
 
@@ -841,6 +961,7 @@ function endGame(victory) {
     localStorage.setItem("bw-best", String(state.best));
   }
   overlay.hidden = false;
+  upgradePanel.hidden = true;
   hudButtons.hidden = true;
   restartBtn.hidden = true;
   document.querySelector("#eyebrow").textContent = victory ? STR.victory : STR.defeat;
@@ -890,7 +1011,8 @@ restartBtn.addEventListener("click", resetGame);
 function refreshLocks() {
   for (let i = 0; i < lockTargets.length; i += 1) lockTargets[i] = null;
   let filled = 0;
-  for (let pass = 0; pass < lockTargets.length; pass += 1) {
+  const lockLimit = state.itemStats.missileLocks;
+  for (let pass = 0; pass < lockLimit; pass += 1) {
     let best = null;
     let bestDistance = 421 * 421;
     for (let i = 0; i < enemies.length; i += 1) {
@@ -971,8 +1093,20 @@ function activateOverdrive() {
     return false;
   }
   player.overdrive = 0;
-  player.overdriveTime = 2.8;
-  player.invulnerable = Math.max(player.invulnerable, 2.8);
+  player.overdriveTime = state.itemStats.overdriveDuration;
+  player.invulnerable = Math.max(player.invulnerable, state.itemStats.overdriveDuration);
+  if (state.itemStats.empLevel > 0) {
+    for (const shot of shots) {
+      if (shot.active && shot.team === 2) shot.active = false;
+    }
+    for (const enemy of enemies) {
+      if (!enemy.active) continue;
+      enemy.hp -= 18 * state.itemStats.empLevel;
+      enemy.hitFlash = 1;
+      if (enemy.hp <= 0) defeatEnemy(enemy);
+    }
+    spawnEffect(player.x, player.y, 2.3 + state.itemStats.empLevel * 0.3, 0.72);
+  }
   audio.boost();
   state.shake = Math.max(state.shake, 7);
   state.flash = settings.reduceFlash ? 0.05 : 0.24;
@@ -982,6 +1116,15 @@ function activateOverdrive() {
 
 function damagePlayer(amount) {
   if (player.invulnerable > 0 || player.overdriveTime > 0 || state.mode !== "running") return;
+  if (player.shield > 0) {
+    player.shield -= 1;
+    player.invulnerable = 0.55;
+    state.shake = settings.reduceShake ? 1 : 5;
+    state.flash = settings.reduceFlash ? 0.035 : 0.12;
+    spawnEffect(player.x, player.y, 0.9, 0.38);
+    audio.hit();
+    return;
+  }
   player.hp -= amount;
   player.invulnerable = 0.7;
   state.combo = 1;
@@ -1048,10 +1191,28 @@ function updatePlayer() {
   if (state.intro <= 0 && player.fire <= 0) {
     const rate = player.overdriveTime > 0 ? 0.065 : 0.115;
     player.fire += rate;
-    const damage = player.overdriveTime > 0 ? 7 : 4;
-    spawnShot(1, player.x - 13, player.y - 38, -22, -840, 4, damage, 2);
-    spawnShot(1, player.x + 13, player.y - 38, 22, -840, 4, damage, 2);
-    if (player.overdriveTime > 0) spawnShot(1, player.x, player.y - 48, 0, -920, 5, damage, 2);
+    const boostMultiplier = player.overdriveTime > 0 ? state.itemStats.overdriveMultiplier : 1;
+    const damage = (player.overdriveTime > 0 ? 7 : 4) * state.itemStats.cannonDamage * boostMultiplier;
+    const pierce = state.itemStats.pierce;
+    spawnShot(1, player.x - 13, player.y - 38, -22, -840, 4, damage, 2, pierce);
+    spawnShot(1, player.x + 13, player.y - 38, 22, -840, 4, damage, 2, pierce);
+    for (let level = 0; level < state.itemStats.extraWingShots; level += 1) {
+      const offset = 31 + level * 11;
+      const drift = 52 + level * 24;
+      spawnShot(1, player.x - offset, player.y - 27, -drift, -810, 4, damage * 0.72, 2, pierce);
+      spawnShot(1, player.x + offset, player.y - 27, drift, -810, 4, damage * 0.72, 2, pierce);
+    }
+    if (state.itemStats.spreadLevel > 0) {
+      const spread = 75 + state.itemStats.spreadLevel * 38;
+      spawnShot(1, player.x, player.y - 44, 0, -860, 4, damage * 0.82, 2, pierce);
+      spawnShot(1, player.x - 8, player.y - 38, -spread, -825, 4, damage * 0.66, 2, pierce);
+      spawnShot(1, player.x + 8, player.y - 38, spread, -825, 4, damage * 0.66, 2, pierce);
+    }
+    for (let drone = 0; drone < state.itemStats.wingmen; drone += 1) {
+      const side = drone === 0 ? -1 : 1;
+      spawnShot(1, player.x + side * 58, player.y - 6, side * 18, -780, 4, damage * state.itemStats.wingmanDamage, 2, pierce);
+    }
+    if (player.overdriveTime > 0) spawnShot(1, player.x, player.y - 48, 0, -920, 5, damage, 2, pierce);
     audio.cannon(state.time);
   }
 
@@ -1066,7 +1227,82 @@ function updatePlayer() {
   input.injectedBoost = false;
 }
 
+function updateBoss(enemy) {
+  const stage = getStage(state.stageIndex);
+  const healthRatio = enemy.hp / enemy.maxHp;
+  const phase = healthRatio > 0.66 ? 0 : healthRatio > 0.33 ? 1 : 2;
+  if (enemy.y < 175) {
+    enemy.y += 95 * DT;
+    return;
+  }
+
+  const damage = Math.round((10 + phase) * stage.difficulty);
+  if (state.stageIndex === 0) {
+    enemy.x = WORLD_W * 0.5 + Math.sin(enemy.age * 0.72) * 125;
+    if (enemy.shoot <= 0) {
+      shootAimed(enemy, 235 + phase * 30, 0.1 + phase * 0.035, damage);
+      enemy.shoot = 0.9 - phase * 0.14;
+    }
+    if (enemy.altShoot <= 0) {
+      shootRadial(enemy, 12 + phase * 4, 145 + phase * 22, enemy.age * (0.22 + phase * 0.08), damage);
+      enemy.altShoot = 2.8 - phase * 0.35;
+    }
+  } else if (state.stageIndex === 1) {
+    enemy.x = WORLD_W * 0.5 + Math.sin(enemy.age * 0.46) * 82;
+    if (enemy.shoot <= 0) {
+      shootFan(enemy, 5 + phase * 2, 230 + phase * 24, 0.115, damage);
+      enemy.shoot = 1.18 - phase * 0.12;
+    }
+    if (enemy.altShoot <= 0) {
+      shootRadial(enemy, 8 + phase * 4, 178 + phase * 15, phase % 2 ? enemy.age * -0.38 : enemy.age * 0.38, damage);
+      enemy.altShoot = 2.45 - phase * 0.28;
+    }
+  } else if (state.stageIndex === 2) {
+    enemy.x = WORLD_W * 0.5 + Math.sin(enemy.age * (1.1 + phase * 0.12)) * (205 + phase * 12);
+    enemy.y = 178 + Math.cos(enemy.age * 1.7) * 28;
+    if (enemy.shoot <= 0) {
+      shootFan(enemy, 5 + phase * 2, 290 + phase * 34, 0.09 + phase * 0.015, damage);
+      enemy.shoot = 0.82 - phase * 0.11;
+    }
+    if (enemy.altShoot <= 0) {
+      shootRadial(enemy, 10 + phase * 5, 205, enemy.age * -0.62, damage);
+      enemy.altShoot = 2.25 - phase * 0.24;
+    }
+  } else if (state.stageIndex === 3) {
+    enemy.x = WORLD_W * 0.5 + Math.sin(enemy.age * 0.62) * 102;
+    enemy.y = 182 + Math.cos(enemy.age * 0.88) * 34;
+    if (enemy.shoot <= 0) {
+      shootAimed(enemy, 255 + phase * 28, 0.14 + phase * 0.025, damage);
+      enemy.shoot = 0.82 - phase * 0.1;
+    }
+    if (enemy.altShoot <= 0) {
+      shootRadial(enemy, 18 + phase * 6, 158 + phase * 22, enemy.age * (0.7 + phase * 0.16), damage);
+      enemy.altShoot = 2.05 - phase * 0.23;
+    }
+  } else {
+    enemy.x = WORLD_W * 0.5 + Math.sin(enemy.age * 0.4) * 72;
+    enemy.y = 184 + Math.cos(enemy.age * 0.55) * 20;
+    if (enemy.shoot <= 0) {
+      shootFan(enemy, 7 + phase * 2, 280 + phase * 35, 0.085 + phase * 0.012, damage + 2);
+      enemy.shoot = 0.75 - phase * 0.1;
+    }
+    if (enemy.altShoot <= 0) {
+      shootRadial(enemy, 20 + phase * 6, 175 + phase * 24, enemy.age * (0.58 + phase * 0.18), damage);
+      enemy.altShoot = 1.85 - phase * 0.2;
+    }
+  }
+
+  if (phase >= 1 && enemy.summon <= 0) {
+    const escortType = phase === 2 || state.stageIndex >= 3 ? 1 : 0;
+    spawnEnemy(escortType, 90 + rand() * 540, -90, rand() * 5);
+    spawnEnemy(0, 90 + rand() * 540, -150, rand() * 5);
+    if (state.stageIndex === 4 && phase === 2) spawnEnemy(2, 160 + rand() * 400, -240, rand() * 5);
+    enemy.summon = Math.max(3.8, 6.5 - state.stageIndex * 0.35 - phase * 0.85);
+  }
+}
+
 function updateEnemies() {
+  const stage = getStage(state.stageIndex);
   for (let i = 0; i < enemies.length; i += 1) {
     const enemy = enemies[i];
     if (!enemy.active) continue;
@@ -1077,10 +1313,10 @@ function updateEnemies() {
     enemy.summon -= DT;
 
     if (enemy.type === 0) {
-      enemy.y += (150 + state.wave * 2) * DT;
+      enemy.y += (150 + state.wave * 2 + state.stageIndex * 8) * DT;
       enemy.x += Math.sin(enemy.age * 3.2 + enemy.phase) * 78 * DT;
       if (enemy.shoot <= 0 && enemy.y > 40) {
-        shootAimed(enemy, 210, 0, 8);
+        shootAimed(enemy, 210 + state.stageIndex * 8, 0, Math.round(8 * stage.difficulty));
         enemy.shoot = 1.55 + rand() * 0.7;
       }
     } else if (enemy.type === 1) {
@@ -1088,42 +1324,22 @@ function updateEnemies() {
       enemy.x += Math.sin(enemy.age * 2.25 + enemy.phase) * 155 * DT;
       enemy.x = Math.max(45, Math.min(WORLD_W - 45, enemy.x));
       if (enemy.shoot <= 0 && enemy.y > 50) {
-        shootAimed(enemy, 255, 0.13, 10);
+        shootAimed(enemy, 255 + state.stageIndex * 9, 0.13, Math.round(10 * stage.difficulty));
         enemy.shoot = 1.25 + rand() * 0.4;
       }
     } else if (enemy.type === 2) {
       enemy.y += 65 * DT;
       enemy.x += Math.sin(enemy.age * 1.25 + enemy.phase) * 48 * DT;
       if (enemy.shoot <= 0 && enemy.y > 60) {
-        shootRadial(enemy, 10, 160, enemy.age * 0.45, 9);
+        shootRadial(enemy, 10 + Math.floor(state.stageIndex / 2) * 2, 160 + state.stageIndex * 5, enemy.age * 0.45, Math.round(9 * stage.difficulty));
         enemy.shoot = 2.35;
       }
       if (enemy.altShoot <= 0) {
-        shootAimed(enemy, 205, 0.11, 10);
+        shootAimed(enemy, 205 + state.stageIndex * 8, 0.11, Math.round(10 * stage.difficulty));
         enemy.altShoot = 3.1;
       }
     } else {
-      if (enemy.y < 175) {
-        enemy.y += 95 * DT;
-      } else {
-        enemy.x = WORLD_W * 0.5 + Math.sin(enemy.age * 0.72) * 125;
-        const healthRatio = enemy.hp / enemy.maxHp;
-        const phase = healthRatio > 0.66 ? 0 : healthRatio > 0.33 ? 1 : 2;
-        if (enemy.shoot <= 0) {
-          shootAimed(enemy, 235 + phase * 30, 0.1 + phase * 0.035, 12 + phase);
-          enemy.shoot = 0.9 - phase * 0.14;
-        }
-        if (enemy.altShoot <= 0) {
-          shootRadial(enemy, 12 + phase * 4, 145 + phase * 22, enemy.age * (0.22 + phase * 0.08), 10 + phase);
-          enemy.altShoot = 2.8 - phase * 0.35;
-          state.shake = Math.max(state.shake, 2);
-        }
-        if (phase >= 1 && enemy.summon <= 0) {
-          spawnEnemy(phase === 2 ? 1 : 0, 90 + rand() * 540, -90, rand() * 5);
-          spawnEnemy(0, 90 + rand() * 540, -150, rand() * 5);
-          enemy.summon = phase === 2 ? 4.8 : 6.5;
-        }
-      }
+      updateBoss(enemy);
     }
 
     if (enemy.y > WORLD_H + 150) enemy.active = false;
@@ -1155,11 +1371,16 @@ function updateShots() {
     if (shot.team === 1) {
       for (let e = 0; e < enemies.length; e += 1) {
         const enemy = enemies[e];
-        if (!enemy.active) continue;
+        if (!enemy.active || shot.lastHit === enemy) continue;
         const dx = shot.x - enemy.x;
         const dy = shot.y - enemy.y;
         if (dx * dx + dy * dy > (shot.radius + enemy.radius * 0.72) ** 2) continue;
-        shot.active = false;
+        if (shot.pierce > 0) {
+          shot.pierce -= 1;
+          shot.lastHit = enemy;
+        } else {
+          shot.active = false;
+        }
         const coreOpen = enemy.type !== 3 || Math.sin(enemy.age * 2.4) > -0.25;
         enemy.hp -= shot.damage * (coreOpen ? 1 : 0.35);
         enemy.hitFlash = 1;
@@ -1215,7 +1436,7 @@ function updateMissiles() {
       const dy = missile.y - enemy.y;
       if (dx * dx + dy * dy > (enemy.radius * 0.78 + 10) ** 2) continue;
       missile.active = false;
-      enemy.hp -= 34;
+      enemy.hp -= state.itemStats.missileDamage;
       enemy.hitFlash = 1;
       spawnEffect(missile.x, missile.y, 0.48, 0.32);
       audio.explosion(0.35);
@@ -1235,7 +1456,7 @@ function updatePickups() {
     const dx = player.x - pickup.x;
     const dy = player.y - pickup.y;
     const distance = Math.hypot(dx, dy) || 1;
-    if (distance < 180) {
+    if (distance < state.itemStats.pickupRange) {
       pickup.vx += dx / distance * 620 * DT;
       pickup.vy += dy / distance * 620 * DT;
     }
@@ -1275,6 +1496,7 @@ function update() {
   }
 
   state.time += DT;
+  state.stageTime += DT;
   if (state.bossStingerDelay > 0) {
     state.bossStingerDelay -= DT;
     if (state.bossStingerDelay <= 0) audio.bossStinger();
@@ -1282,7 +1504,9 @@ function update() {
   if (state.pendingVictory) {
     state.victoryDelay -= DT;
     if (state.victoryDelay <= 0) {
-      endGame(true);
+      state.pendingVictory = false;
+      if (state.stageIndex >= STAGES.length - 1) endGame(true);
+      else showUpgradePanel();
       input.missileEdge = false;
       input.boostEdge = false;
       return;
@@ -1300,9 +1524,9 @@ function update() {
     state.lockRefresh = 0.12;
   }
 
-  const bossAt = QUICK ? 34 : 108;
-  if (!state.bossSpawned && state.time >= state.nextWave && state.time < bossAt) spawnWave();
-  if (!state.bossSpawned && state.time >= bossAt) spawnBoss();
+  const bossAt = getBossTime(state.stageIndex, QUICK);
+  if (!state.bossSpawned && state.stageTime >= state.nextWave && state.stageTime < bossAt) spawnWave();
+  if (!state.bossSpawned && state.stageTime >= bossAt) spawnBoss();
 
   updatePlayer();
   updateEnemies();
@@ -1329,7 +1553,8 @@ function drawImageCentered(image, x, y, targetHeight, rotation = 0, alpha = 1) {
 }
 
 function drawBackground() {
-  const bg = images.background;
+  const stage = getStage(state.stageIndex);
+  const bg = images[stage.background];
   if (!bg) {
     ctx.fillStyle = "#03101f";
     ctx.fillRect(0, 0, WORLD_W, WORLD_H);
@@ -1352,15 +1577,67 @@ function drawBackground() {
   ctx.drawImage(bg, sx + drift, sy, sw, sh, 0, 0, WORLD_W, WORLD_H);
   const pulse = 0.055 + Math.max(0, Math.sin(state.time * 0.72)) * 0.025;
   ctx.globalAlpha = pulse;
-  ctx.fillStyle = "#00cfe8";
+  ctx.fillStyle = stage.accent;
   ctx.fillRect(0, 0, WORLD_W, WORLD_H * 0.42);
   ctx.globalAlpha = 0.26;
   ctx.fillStyle = "#020916";
   ctx.fillRect(0, WORLD_H * 0.72, WORLD_W, WORLD_H * 0.28);
   ctx.globalAlpha = 1;
+  drawStageAtmosphere();
+}
+
+function drawStageAtmosphere() {
+  const motion = settings.reduceShake ? state.time * 0.35 : state.time;
+  ctx.save();
+  if (state.stageIndex === 0) {
+    ctx.strokeStyle = "rgba(174, 235, 255, .2)";
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    for (let index = 0; index < 22; index += 1) {
+      const x = (index * 97 + motion * 126) % (WORLD_W + 100) - 50;
+      const y = (index * 173 + motion * 310) % WORLD_H;
+      ctx.moveTo(x, y);
+      ctx.lineTo(x - 19, y + 46);
+    }
+    ctx.stroke();
+  } else if (state.stageIndex === 1) {
+    const dust = 0.035 + Math.sin(motion * 0.8) * 0.018;
+    ctx.globalAlpha = dust;
+    ctx.fillStyle = "#ff9a45";
+    ctx.fillRect(0, 0, WORLD_W, WORLD_H);
+  } else if (state.stageIndex === 2) {
+    const scanX = WORLD_W * 0.5 + Math.sin(motion * 0.55) * 310;
+    const beam = ctx.createLinearGradient(scanX - 100, 0, scanX + 100, 0);
+    beam.addColorStop(0, "rgba(214, 108, 255, 0)");
+    beam.addColorStop(0.5, "rgba(214, 108, 255, .13)");
+    beam.addColorStop(1, "rgba(214, 108, 255, 0)");
+    ctx.fillStyle = beam;
+    ctx.fillRect(scanX - 100, 0, 200, WORLD_H);
+  } else if (state.stageIndex === 3) {
+    ctx.fillStyle = "rgba(225, 248, 255, .55)";
+    for (let index = 0; index < 38; index += 1) {
+      const x = (index * 113 + Math.sin(index * 8.7) * 80 + motion * 55) % WORLD_W;
+      const y = (index * 179 + motion * (105 + index % 5 * 15)) % WORLD_H;
+      const size = 1.5 + index % 3;
+      ctx.fillRect(x, y, size, size * 2.2);
+    }
+  } else {
+    ctx.strokeStyle = "rgba(255, 105, 69, .32)";
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    for (let index = 0; index < 18; index += 1) {
+      const x = (index * 149 + motion * 42) % WORLD_W;
+      const y = (index * 227 + motion * 150) % WORLD_H;
+      ctx.moveTo(x, y);
+      ctx.lineTo(x - 6, y + 21 + index % 4 * 5);
+    }
+    ctx.stroke();
+  }
+  ctx.restore();
 }
 
 function drawEnemies() {
+  const stage = getStage(state.stageIndex);
   for (let i = 0; i < enemies.length; i += 1) {
     const enemy = enemies[i];
     if (!enemy.active) continue;
@@ -1368,7 +1645,7 @@ function drawEnemies() {
     let height = 84;
     if (enemy.type === 1) { image = images.interceptor; height = 100; }
     else if (enemy.type === 2) { image = images.bomber; height = 142; }
-    else if (enemy.type === 3) { image = images.boss; height = 455; }
+    else if (enemy.type === 3) { image = images[stage.bossImage]; height = stage.bossHeight; }
     ctx.save();
     ctx.shadowBlur = enemy.type === 3 ? 28 : 12;
     ctx.shadowColor = enemy.type === 0 ? "rgba(255,74,42,.9)" : "rgba(255,112,38,.72)";
@@ -1377,7 +1654,7 @@ function drawEnemies() {
     ctx.restore();
     if (enemy.type === 3 && enemy.y > 0) {
       const open = Math.sin(enemy.age * 2.4) > -0.25;
-      ctx.strokeStyle = open ? "rgba(255,138,56,.95)" : "rgba(75,225,255,.55)";
+      ctx.strokeStyle = open ? stage.accent : "rgba(75,225,255,.55)";
       ctx.lineWidth = 4;
       ctx.beginPath();
       ctx.arc(enemy.x, enemy.y + 10, 31 + Math.sin(enemy.age * 5) * 5, 0, Math.PI * 2);
@@ -1494,6 +1771,11 @@ function drawPlayer() {
   const visible = player.invulnerable <= 0 || Math.floor(state.time * 16) % 2 === 0;
   if (!visible && player.overdriveTime <= 0) return;
   ctx.save();
+  for (let drone = 0; drone < state.itemStats.wingmen; drone += 1) {
+    const side = drone === 0 ? -1 : 1;
+    const bob = Math.sin(state.time * 4.5 + drone * Math.PI) * 7;
+    drawImageCentered(images.hero, player.x + side * 58, player.y + 20 + bob, 53, side * 0.035, 0.88);
+  }
   if (player.overdriveTime > 0) {
     ctx.shadowBlur = 30;
     ctx.shadowColor = "#27efff";
@@ -1507,6 +1789,15 @@ function drawPlayer() {
     ctx.fill();
   }
   drawImageCentered(images.hero, player.x, player.y, 112, player.vx * 0.00028);
+  if (player.shield > 0) {
+    ctx.strokeStyle = "rgba(142, 245, 255, .78)";
+    ctx.lineWidth = 3;
+    ctx.shadowBlur = 18;
+    ctx.shadowColor = "#31eaff";
+    ctx.beginPath();
+    ctx.arc(player.x, player.y, 51 + Math.sin(state.time * 5) * 3, 0, Math.PI * 2);
+    ctx.stroke();
+  }
   ctx.restore();
 }
 
@@ -1525,6 +1816,7 @@ function drawBar(x, y, width, height, value, color, label) {
 }
 
 function drawHud() {
+  const stage = getStage(state.stageIndex);
   ctx.save();
   ctx.fillStyle = "rgba(2, 9, 22, .62)";
   ctx.fillRect(0, 0, WORLD_W, 108);
@@ -1535,15 +1827,22 @@ function drawHud() {
   ctx.fillStyle = "#8ef5ff";
   ctx.font = "700 16px Bahnschrift, sans-serif";
   ctx.fillText(`${STR.combo} x${state.combo.toFixed(1)}`, 28, 66);
-  drawBar(225, 29, 165, 14, player.hp / 100, "#ff7042", STR.hull);
+  const shieldText = player.shield > 0 ? ` · ${"⬡".repeat(player.shield)}` : "";
+  drawBar(225, 29, 165, 14, player.hp / state.itemStats.maxHp, "#ff7042", `${STR.hull}${shieldText}`);
   drawBar(225, 74, 165, 14, player.overdrive / 100, "#31eaff", STR.overdrive);
   ctx.textAlign = "right";
   ctx.fillStyle = "#ffd45b";
   ctx.font = "700 17px Bahnschrift, sans-serif";
   ctx.fillText(`${STR.missiles} ${"◆".repeat(player.missileCharges)}${"◇".repeat(3 - player.missileCharges)}`, 690, 46);
+  ctx.fillStyle = stage.accent;
+  ctx.font = "800 15px Bahnschrift, sans-serif";
+  ctx.fillText(`${STR.stage} ${state.stageIndex + 1}/${STAGES.length}`, 690, 76);
+  ctx.fillStyle = "rgba(244, 251, 255, .72)";
+  ctx.font = "700 13px Bahnschrift, sans-serif";
+  ctx.fillText(STR[stage.nameKey], 690, 98);
   if (state.boss?.active) {
     const boss = state.boss;
-    drawBar(120, 135, 480, 18, boss.hp / boss.maxHp, "#ff5f34", STR.boss);
+    drawBar(120, 135, 480, 18, boss.hp / boss.maxHp, "#ff5f34", STR[stage.bossKey]);
   }
   if (state.bannerTime > 0) {
     const alpha = Math.min(1, state.bannerTime * 1.8, (2.2 - state.bannerTime) * 2.5);
@@ -1672,6 +1971,8 @@ function debugSnapshot() {
   return {
     mode: state.mode,
     time: Number(state.time.toFixed(2)),
+    stageTime: Number(state.stageTime.toFixed(2)),
+    stage: state.stageIndex + 1,
     score: Math.round(state.score),
     hull: Math.round(player.hp),
     overdrive: Math.round(player.overdrive),
@@ -1681,6 +1982,7 @@ function debugSnapshot() {
     bossActive: Boolean(state.boss?.active),
     bossHp: state.boss?.active ? Math.round(state.boss.hp) : 0,
     pendingVictory: state.pendingVictory,
+    items: { ...state.itemLevels },
     kills: state.kills,
     activeEnemies,
     activeShots,
@@ -1699,8 +2001,12 @@ window.__BLACKWING__ = {
     if (command === "pause") input.pauseEdge = true;
   },
   spawnBoss() {
-    state.time = QUICK ? 34 : 108;
+    state.stageTime = getBossTime(state.stageIndex, QUICK);
     spawnBoss();
+  },
+  revealBoss() {
+    if (state.boss?.active) state.boss.y = 180;
+    return debugSnapshot();
   },
   damageBoss(amount = 9999) {
     if (state.boss?.active) {
@@ -1717,6 +2023,10 @@ window.__BLACKWING__ = {
   },
   setInvulnerable(seconds = 30) {
     player.invulnerable = Math.max(player.invulnerable, seconds);
+  },
+  chooseUpgrade(itemId) {
+    if (state.mode === "upgrade" && ITEMS[itemId]) equipUpgrade(itemId);
+    return debugSnapshot();
   },
   simulate(ticks = 60) {
     const wasVisibilityPaused = pausedByVisibility;

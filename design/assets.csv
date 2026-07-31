@@ -4,8 +4,16 @@ enemy_scout,fast light enemy and formation filler,static 2D sprite,crimson needl
 enemy_interceptor,aggressive flanking enemy with aimed shots,static 2D sprite,orange swept interceptor jet,1:1 enemy scale 1.0,style_formula_v1,generate
 enemy_bomber,slow armored enemy with radial attacks,static 2D sprite,crimson heavy bomber jet,1:1 enemy scale 1.35,style_formula_v1,generate
 boss_carrier,final multi-phase enemy centerpiece,static 2D sprite,armored crimson sky carrier,1:1 boss scale 3.4,style_formula_v1,generate
+boss_moloch,stage two multi-phase enemy centerpiece,static 2D sprite,wedge-shaped desert siege dreadnought,1:1 boss scale 3.2,style_formula_v1,generate
+boss_phantom,stage three multi-phase enemy centerpiece,static 2D sprite,crescent black stealth bomber,1:1 boss scale 2.9,style_formula_v1,generate
+boss_boreas,stage four multi-phase enemy centerpiece,static 2D sprite,circular ice-blue weather engine,1:1 boss scale 3.1,style_formula_v1,generate
+boss_erebus,final multi-phase enemy centerpiece,static 2D sprite,black cruciform orbital fortress,1:1 boss scale 3.7,style_formula_v1,generate
 explosion_burst,enemy destruction boss damage and player hit reaction,static 2D sprite,orange cyan explosion burst,1:1 effect scale 0.7-2.4,style_formula_v1,generate
 ocean_backdrop,full-height battlefield surface and atmospheric cloud layer,2D background,storm ocean cloud shadows,9:16 1024x1792,style_formula_v1,generate
+canyon_backdrop,stage two battlefield surface,2D background,red canyon military corridor,9:16 portrait,style_formula_v1,generate
+neon_backdrop,stage three battlefield surface,2D background,rainy neon city blockade,9:16 portrait,style_formula_v1,generate
+boreal_backdrop,stage four battlefield surface,2D background,frozen ocean and storm clouds,9:16 portrait,style_formula_v1,generate
+erebus_backdrop,final battlefield surface,2D background,orbital fortress above a dark planet,9:16 portrait,style_formula_v1,generate
 cover_art,public game thumbnail social card and start-screen cinematic backdrop,2D background,storm interception battlefield,16:9 1280x720,style_formula_v1,generate
 favicon_emblem,public catalog favicon set home-screen icon and in-game insignia,2D UI element,blackwing cyan wing emblem,1:1 square,style_formula_v1,generate
 combat_music,seamless main combat soundtrack,audio music loop,driving synthwave jet combat,30 second stereo loop,style_formula_v1,generate

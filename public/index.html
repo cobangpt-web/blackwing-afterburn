@@ -4,13 +4,13 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
   <title>BLACKWING // AFTERBURN — 네온 제트 슈터</title>
-  <meta name="description" content="아슬아슬한 회피로 오버드라이브를 충전하고, 다중 록온 미사일로 적 편대와 거대 공중항모를 격침하는 초고속 제트 슈터.">
+  <meta name="description" content="아슬아슬한 회피로 오버드라이브를 충전하고 전투 코어를 강화하며, 다섯 전장과 거대 보스를 돌파하는 초고속 제트 슈터.">
   <link rel="canonical" href="https://blackwing-afterburn.vercel.app/">
 
   <meta property="og:type" content="website">
   <meta property="og:site_name" content="BLACKWING // AFTERBURN">
   <meta property="og:title" content="BLACKWING // AFTERBURN">
-  <meta property="og:description" content="LOCK / BREAK / BURN — 회피를 화력으로 바꾸는 초고속 제트 슈터.">
+  <meta property="og:description" content="LOCK / BREAK / BURN — 전투 코어를 강화하며 다섯 전장을 돌파하는 초고속 제트 슈터.">
   <meta property="og:image" content="https://blackwing-afterburn.vercel.app/og.png">
   <meta property="og:image:width" content="1200">
   <meta property="og:image:height" content="630">
@@ -19,7 +19,7 @@
 
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:title" content="BLACKWING // AFTERBURN">
-  <meta name="twitter:description" content="LOCK / BREAK / BURN — 회피를 화력으로 바꾸는 초고속 제트 슈터.">
+  <meta name="twitter:description" content="LOCK / BREAK / BURN — 전투 코어를 강화하며 다섯 전장을 돌파하는 초고속 제트 슈터.">
   <meta name="twitter:image" content="https://blackwing-afterburn.vercel.app/og.png">
 
   <meta name="theme-color" content="#020916">
@@ -89,6 +89,85 @@
       z-index: 10;
     }
     #overlay[hidden] { display: none; }
+    #upgradePanel {
+      position: fixed;
+      inset: 0;
+      z-index: 9;
+      display: grid;
+      place-items: center;
+      padding: 24px;
+      background: rgba(1, 7, 17, .82);
+      backdrop-filter: blur(8px);
+    }
+    #upgradePanel[hidden] { display: none; }
+    .upgrade-shell {
+      width: min(920px, 100%);
+      padding: clamp(20px, 4vw, 40px);
+      border: 1px solid rgba(142, 245, 255, .34);
+      border-top: 3px solid var(--cyan-400);
+      background:
+        linear-gradient(145deg, rgba(8, 30, 50, .96), rgba(2, 9, 22, .98));
+      box-shadow: 0 28px 90px rgba(0, 0, 0, .62);
+    }
+    .upgrade-title {
+      margin: 0;
+      font-size: clamp(27px, 4vw, 46px);
+      letter-spacing: -.035em;
+    }
+    .upgrade-hint {
+      margin: 8px 0 22px;
+      color: rgba(244, 251, 255, .67);
+      line-height: 1.5;
+    }
+    #upgradeChoices {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 12px;
+    }
+    .upgrade-card {
+      min-height: 230px;
+      padding: 20px;
+      text-align: left;
+      border-color: rgba(142, 245, 255, .32);
+      background:
+        radial-gradient(circle at 50% 0%, rgba(49, 234, 255, .14), transparent 48%),
+        linear-gradient(180deg, rgba(15, 48, 72, .97), rgba(3, 16, 31, .98));
+    }
+    .upgrade-card:hover,
+    .upgrade-card:focus-visible {
+      border-color: var(--cyan-300);
+      box-shadow: inset 0 0 32px rgba(49, 234, 255, .12), 0 0 36px rgba(0, 207, 232, .17);
+    }
+    .upgrade-icon {
+      display: block;
+      min-height: 52px;
+      color: var(--orange-400);
+      font-size: 39px;
+      line-height: 1;
+      letter-spacing: -.08em;
+    }
+    .upgrade-name {
+      display: block;
+      margin-top: 14px;
+      color: var(--white);
+      font-size: 20px;
+      font-weight: 800;
+    }
+    .upgrade-level {
+      display: block;
+      margin-top: 6px;
+      color: var(--cyan-300);
+      font-size: 13px;
+      letter-spacing: .12em;
+      text-transform: uppercase;
+    }
+    .upgrade-description {
+      display: block;
+      margin-top: 13px;
+      color: rgba(244, 251, 255, .7);
+      font-size: 14px;
+      line-height: 1.48;
+    }
     .panel {
       width: min(560px, 100%);
       margin-right: min(42vw, 620px);
@@ -258,6 +337,28 @@
       }
       h1 { max-width: 10ch; }
       #controlsHelp { display: none; }
+      #upgradePanel {
+        align-items: end;
+        padding: 14px 12px calc(14px + var(--safe-bottom));
+      }
+      .upgrade-shell { padding: 20px 16px; }
+      #upgradeChoices {
+        grid-template-columns: 1fr;
+        gap: 8px;
+      }
+      .upgrade-card {
+        min-height: 0;
+        padding: 14px 16px;
+      }
+      .upgrade-icon {
+        float: left;
+        width: 62px;
+        min-height: 62px;
+        margin-right: 10px;
+        font-size: 31px;
+      }
+      .upgrade-name { margin-top: 0; }
+      .upgrade-description { margin-top: 6px; }
     }
     @media (prefers-reduced-motion: reduce) {
       #overlay { transition: none; }
@@ -291,6 +392,14 @@
           <label class="setting"><input id="muteToggle" type="checkbox"><span id="muteLabel"></span></label>
         </div>
         <p id="controlsHelp"></p>
+      </div>
+    </section>
+    <section id="upgradePanel" aria-labelledby="upgradeTitle" hidden>
+      <div class="upgrade-shell">
+        <p id="upgradeEyebrow" class="eyebrow"></p>
+        <h2 id="upgradeTitle" class="upgrade-title"></h2>
+        <p id="upgradeHint" class="upgrade-hint"></p>
+        <div id="upgradeChoices"></div>
       </div>
     </section>
     <div id="dev"></div>
