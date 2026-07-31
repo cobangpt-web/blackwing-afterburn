@@ -2,6 +2,8 @@
 
 Fast top-down jet shooter built for desktop and mobile browsers.
 
+Live: https://blackwing-afterburn.vercel.app/
+
 ## Play
 
 - Move, dodge, and build overdrive from close calls.
