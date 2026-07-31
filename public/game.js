@@ -9,6 +9,7 @@ import {
   getStage,
   getUpgradeChoices,
 } from "./campaign.js";
+import { drawLowerFieldShade, drawUpperFieldTint } from "./rendering.js";
 
 const WORLD_W = 720;
 const WORLD_H = 1280;
@@ -1745,13 +1746,8 @@ function drawBackground() {
   const drift = Math.sin(state.time * 0.055) * Math.min(24, sx);
   ctx.drawImage(bg, sx + drift, sy, sw, sh, 0, 0, WORLD_W, WORLD_H);
   const pulse = 0.055 + Math.max(0, Math.sin(state.time * 0.72)) * 0.025;
-  ctx.globalAlpha = pulse;
-  ctx.fillStyle = stage.accent;
-  ctx.fillRect(0, 0, WORLD_W, WORLD_H * 0.42);
-  ctx.globalAlpha = 0.26;
-  ctx.fillStyle = "#020916";
-  ctx.fillRect(0, WORLD_H * 0.72, WORLD_W, WORLD_H * 0.28);
-  ctx.globalAlpha = 1;
+  drawUpperFieldTint(ctx, WORLD_W, WORLD_H, stage.accent, pulse);
+  drawLowerFieldShade(ctx, WORLD_W, WORLD_H);
   drawStageAtmosphere();
 }
 
