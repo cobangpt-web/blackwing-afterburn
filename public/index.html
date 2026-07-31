@@ -42,12 +42,16 @@
       --glass: rgba(3, 15, 31, .78);
       --glass-soft: rgba(8, 28, 49, .58);
       --focus: #ffffff;
+      --safe-left: env(safe-area-inset-left, 0px);
+      --safe-right: env(safe-area-inset-right, 0px);
       --safe-bottom: env(safe-area-inset-bottom, 0px);
+      --touch-size: 76px;
     }
     * { box-sizing: border-box; }
     html, body {
       width: 100%;
       height: 100%;
+      min-height: 100dvh;
       margin: 0;
       overflow: hidden;
       background: radial-gradient(circle at 50% 30%, var(--ink-700), var(--ink-950) 65%);
@@ -254,18 +258,21 @@
       position: absolute;
       pointer-events: auto;
       border-radius: 999px;
-      width: 76px;
-      height: 76px;
+      width: var(--touch-size);
+      height: var(--touch-size);
       padding: 7px;
       font-size: 11px;
       font-weight: 800;
+      line-height: 1.05;
       text-transform: uppercase;
       backdrop-filter: blur(9px);
       -webkit-tap-highlight-color: transparent;
+      display: grid;
+      place-items: center;
     }
-    #missileBtn { right: 22px; bottom: calc(116px + var(--safe-bottom)); }
+    #missileBtn { right: max(22px, var(--safe-right)); bottom: calc(116px + var(--safe-bottom)); }
     #boostBtn {
-      right: 108px;
+      right: calc(max(22px, var(--safe-right)) + 86px);
       bottom: calc(32px + var(--safe-bottom));
       border-color: rgba(255, 138, 56, .72);
     }
@@ -274,8 +281,9 @@
       box-shadow: inset 0 0 24px rgba(255, 138, 56, .22), 0 0 30px rgba(255, 138, 56, .24);
     }
     #pauseBtn {
+      position: absolute;
       top: max(12px, env(safe-area-inset-top));
-      right: 12px;
+      right: max(12px, var(--safe-right));
       width: 44px;
       height: 44px;
       pointer-events: auto;
@@ -296,7 +304,7 @@
     #testToggle {
       position: fixed;
       top: max(12px, env(safe-area-inset-top));
-      left: 12px;
+      left: max(12px, var(--safe-left));
       z-index: 31;
       min-width: 74px;
       min-height: 42px;
@@ -313,7 +321,7 @@
     #testPanel {
       position: fixed;
       top: max(64px, calc(env(safe-area-inset-top) + 58px));
-      left: 12px;
+      left: max(12px, var(--safe-left));
       z-index: 30;
       width: min(370px, calc(100vw - 24px));
       padding: 18px;
@@ -462,6 +470,66 @@
       .upgrade-description { margin-top: 6px; }
       #testPanel {
         max-height: calc(100dvh - 78px - var(--safe-bottom));
+        overflow-y: auto;
+      }
+    }
+    @media (max-width: 600px), (pointer: coarse) and (orientation: portrait) {
+      :root { --touch-size: clamp(68px, 19vw, 82px); }
+      .actions {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 8px;
+      }
+      .primary,
+      .secondary {
+        width: 100%;
+        min-width: 0;
+      }
+      #overlayMessage { margin-top: 20px; }
+      #scoreSummary {
+        min-height: 22px;
+        font-size: 16px;
+      }
+      #missileBtn {
+        right: max(14px, var(--safe-right));
+        bottom: calc(104px + var(--safe-bottom));
+      }
+      #boostBtn {
+        right: max(14px, var(--safe-right));
+        bottom: calc(18px + var(--safe-bottom));
+      }
+      .hud-button {
+        padding: 6px;
+        font-size: 10px;
+        box-shadow: inset 0 0 22px rgba(0, 207, 232, .1), 0 10px 26px rgba(0, 0, 0, .42);
+      }
+      #pauseBtn {
+        top: max(142px, calc(env(safe-area-inset-top) + 142px));
+        right: max(14px, var(--safe-right));
+        width: 42px;
+        height: 42px;
+      }
+      html[data-viewport-mode="portrait-cover"] #testToggle[aria-expanded="false"] {
+        top: max(142px, calc(env(safe-area-inset-top) + 142px));
+        min-width: 58px;
+        min-height: 38px;
+        padding: 7px 10px;
+        font-size: 11px;
+      }
+      #settingsPanel {
+        max-height: 30dvh;
+        overflow-y: auto;
+      }
+    }
+    @media (max-height: 560px) and (orientation: landscape) {
+      .panel {
+        max-height: calc(100dvh - var(--safe-bottom));
+        overflow-y: auto;
+      }
+      #controlsHelp,
+      #overlayMessage { display: none; }
+      .upgrade-shell {
+        max-height: calc(100dvh - 24px - var(--safe-bottom));
         overflow-y: auto;
       }
     }

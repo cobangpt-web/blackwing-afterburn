@@ -10,12 +10,18 @@ import {
   getUpgradeChoices,
 } from "./campaign.js";
 import { drawLowerFieldShade, drawUpperFieldTint } from "./rendering.js";
+import { createViewportLayout, getTouchLeadWorld } from "./viewport.js";
 
 const WORLD_W = 720;
 const WORLD_H = 1280;
 const STEP_MS = 1000 / 60;
 const DT = 1 / 60;
 const DPR_CAP = 1.5;
+const MOBILE_DPR_CAP = 1.25;
+const TOUCH_FOLLOW_DISTANCE = 54;
+const POINTER_FOLLOW_DISTANCE = 70;
+const TOUCH_SPEED = 510;
+const DEFAULT_SPEED = 430;
 const QUERY = new URLSearchParams(location.search);
 const QUICK = QUERY.has("quick");
 const DEV = QUERY.has("dev");
@@ -180,18 +186,35 @@ let viewScale = 1;
 let viewX = 0;
 let viewY = 0;
 let dpr = 1;
+let viewportMode = "contain";
+let visibleWorld = Object.freeze({ left: 0, top: 0, right: WORLD_W, bottom: WORLD_H, width: WORLD_W, height: WORLD_H });
+
+function isCoarsePointer() {
+  return matchMedia("(pointer: coarse)").matches;
+}
 
 function resize() {
   cssW = innerWidth;
   cssH = innerHeight;
-  dpr = Math.min(devicePixelRatio || 1, DPR_CAP);
+  const coarsePointer = isCoarsePointer();
+  dpr = Math.min(devicePixelRatio || 1, coarsePointer ? MOBILE_DPR_CAP : DPR_CAP);
   canvas.width = Math.max(1, Math.round(cssW * dpr));
   canvas.height = Math.max(1, Math.round(cssH * dpr));
   canvas.style.width = `${cssW}px`;
   canvas.style.height = `${cssH}px`;
-  viewScale = Math.min(cssW / WORLD_W, cssH / WORLD_H);
-  viewX = (cssW - WORLD_W * viewScale) * 0.5;
-  viewY = (cssH - WORLD_H * viewScale) * 0.5;
+  const layout = createViewportLayout({
+    screenWidth: cssW,
+    screenHeight: cssH,
+    worldWidth: WORLD_W,
+    worldHeight: WORLD_H,
+    coarsePointer,
+  });
+  viewScale = layout.scale;
+  viewX = layout.x;
+  viewY = layout.y;
+  viewportMode = layout.mode;
+  visibleWorld = layout.visibleWorld;
+  document.documentElement.dataset.viewportMode = viewportMode;
 }
 addEventListener("resize", resize);
 addEventListener("orientationchange", resize);
@@ -475,11 +498,15 @@ const input = {
   boostEdge: false,
   pauseEdge: false,
   pointer: false,
+  pointerTouch: false,
   targetX: WORLD_W * 0.5,
   targetY: WORLD_H * 0.82,
   injectedMissile: false,
   injectedBoost: false,
 };
+
+let activePointerId = null;
+let activeTouchLead = 0;
 
 function releaseTransientInput() {
   input.up = false;
@@ -490,8 +517,11 @@ function releaseTransientInput() {
   input.boostEdge = false;
   input.pauseEdge = false;
   input.pointer = false;
+  input.pointerTouch = false;
   input.injectedMissile = false;
   input.injectedBoost = false;
+  activePointerId = null;
+  activeTouchLead = 0;
   padX = 0;
   padY = 0;
 }
@@ -532,33 +562,55 @@ addEventListener("keyup", (event) => {
   if (move) input[move] = false;
 });
 
+function pointerIsTouch(event) {
+  return event.pointerType === "touch" || (event.pointerType === "" && isCoarsePointer());
+}
+
+function clientToWorld(event) {
+  return {
+    x: (event.clientX - viewX) / viewScale,
+    y: (event.clientY - viewY) / viewScale,
+  };
+}
+
 function pointerToWorld(event) {
-  input.targetX = Math.max(0, Math.min(WORLD_W, (event.clientX - viewX) / viewScale));
-  input.targetY = Math.max(0, Math.min(WORLD_H, (event.clientY - viewY) / viewScale));
+  const point = clientToWorld(event);
+  input.targetX = Math.max(0, Math.min(WORLD_W, point.x));
+  input.targetY = Math.max(0, Math.min(WORLD_H, point.y - activeTouchLead));
 }
 canvas.addEventListener("pointerdown", (event) => {
+  if (activePointerId !== null) return;
+  activePointerId = event.pointerId;
   input.pointer = true;
+  input.pointerTouch = pointerIsTouch(event);
+  activeTouchLead = input.pointerTouch ? getTouchLeadWorld(viewportMode) : 0;
   pointerToWorld(event);
   canvas.setPointerCapture(event.pointerId);
   event.preventDefault();
 });
 canvas.addEventListener("pointermove", (event) => {
-  if (!input.pointer) return;
+  if (!input.pointer || event.pointerId !== activePointerId) return;
   pointerToWorld(event);
   event.preventDefault();
 });
 canvas.addEventListener("pointerup", (event) => {
+  if (event.pointerId !== activePointerId) return;
   input.pointer = false;
+  input.pointerTouch = false;
+  activePointerId = null;
+  activeTouchLead = 0;
   if (canvas.hasPointerCapture(event.pointerId)) canvas.releasePointerCapture(event.pointerId);
   event.preventDefault();
 });
 canvas.addEventListener("pointercancel", releaseTransientInput);
 missileBtn.addEventListener("pointerdown", (event) => {
   input.missileEdge = true;
+  event.stopPropagation();
   event.preventDefault();
 });
 boostBtn.addEventListener("pointerdown", (event) => {
   input.boostEdge = true;
+  event.stopPropagation();
   event.preventDefault();
 });
 pauseBtn.addEventListener("click", () => { input.pauseEdge = true; });
@@ -1339,19 +1391,21 @@ function updatePlayer() {
   if (input.pointer) {
     const dx = input.targetX - player.x;
     const dy = input.targetY - player.y;
-    mx = Math.max(-1, Math.min(1, dx / 70));
-    my = Math.max(-1, Math.min(1, dy / 70));
+    const followDistance = input.pointerTouch ? TOUCH_FOLLOW_DISTANCE : POINTER_FOLLOW_DISTANCE;
+    mx = Math.max(-1, Math.min(1, dx / followDistance));
+    my = Math.max(-1, Math.min(1, dy / followDistance));
   }
   const length = Math.hypot(mx, my);
   if (length > 1) {
     mx /= length;
     my /= length;
   }
-  const speed = player.overdriveTime > 0 ? 620 : 430;
+  const speed = player.overdriveTime > 0 ? 620 : input.pointerTouch ? TOUCH_SPEED : DEFAULT_SPEED;
   const targetVx = mx * speed;
   const targetVy = my * speed;
-  player.vx += (targetVx - player.vx) * 0.24;
-  player.vy += (targetVy - player.vy) * 0.24;
+  const response = input.pointerTouch ? 0.32 : 0.24;
+  player.vx += (targetVx - player.vx) * response;
+  player.vy += (targetVy - player.vy) * response;
   player.x = Math.max(54, Math.min(WORLD_W - 54, player.x + player.vx * DT));
   player.y = Math.max(235, Math.min(WORLD_H - 92, player.y + player.vy * DT));
 
@@ -1980,11 +2034,45 @@ function drawBar(x, y, width, height, value, color, label) {
   ctx.fillText(label, x, y - 7);
 }
 
-function drawHud() {
-  const stage = getStage(state.stageIndex);
-  ctx.save();
-  ctx.fillStyle = "rgba(2, 9, 22, .62)";
-  ctx.fillRect(0, 0, WORLD_W, 108);
+function drawMiniBar(x, y, width, height, value, color, label) {
+  ctx.fillStyle = "rgba(3, 14, 27, .76)";
+  ctx.fillRect(x, y, width, height);
+  ctx.fillStyle = color;
+  ctx.fillRect(x + 2, y + 2, Math.max(0, width - 4) * Math.max(0, Math.min(1, value)), height - 4);
+  ctx.strokeStyle = "rgba(183, 238, 247, .38)";
+  ctx.lineWidth = 2;
+  ctx.strokeRect(x, y, width, height);
+  ctx.fillStyle = "rgba(235, 249, 255, .9)";
+  ctx.font = "800 12px Bahnschrift, sans-serif";
+  ctx.textAlign = "left";
+  ctx.fillText(label, x + 7, y + height - 7);
+}
+
+function drawCompactHud(stage, left, right, shieldText) {
+  const barGap = 12;
+  const barWidth = Math.max(120, (right - left - barGap) * 0.5);
+  ctx.fillStyle = "#f4fbff";
+  ctx.textAlign = "left";
+  ctx.font = "800 17px Bahnschrift, sans-serif";
+  ctx.fillText(`${STR.score} ${Math.round(state.score).toString().padStart(7, "0")}`, left, 35);
+  ctx.fillStyle = "#8ef5ff";
+  ctx.font = "700 14px Bahnschrift, sans-serif";
+  ctx.fillText(`${STR.combo} x${state.combo.toFixed(1)}`, left, 61);
+  ctx.textAlign = "right";
+  ctx.fillStyle = stage.accent;
+  ctx.font = "800 14px Bahnschrift, sans-serif";
+  ctx.fillText(`${STR.stage} ${state.stageIndex + 1}/${STAGES.length}`, right, 35);
+  ctx.fillStyle = "rgba(244, 251, 255, .76)";
+  ctx.font = "700 12px Bahnschrift, sans-serif";
+  ctx.fillText(STR[stage.nameKey], right, 61);
+  ctx.fillStyle = "#ffd45b";
+  ctx.font = "700 12px Bahnschrift, sans-serif";
+  ctx.fillText(`${STR.missiles} ${"◆".repeat(player.missileCharges)}${"◇".repeat(3 - player.missileCharges)}`, right, 84);
+  drawMiniBar(left, 87, barWidth, 22, player.hp / state.itemStats.maxHp, "#ff7042", `${STR.hull}${shieldText}`);
+  drawMiniBar(left + barWidth + barGap, 87, barWidth, 22, player.overdrive / 100, "#31eaff", STR.overdrive);
+}
+
+function drawFullHud(stage, shieldText) {
   ctx.fillStyle = "#f4fbff";
   ctx.textAlign = "left";
   ctx.font = "700 19px Bahnschrift, sans-serif";
@@ -1992,7 +2080,6 @@ function drawHud() {
   ctx.fillStyle = "#8ef5ff";
   ctx.font = "700 16px Bahnschrift, sans-serif";
   ctx.fillText(`${STR.combo} x${state.combo.toFixed(1)}`, 28, 66);
-  const shieldText = player.shield > 0 ? ` · ${"⬡".repeat(player.shield)}` : "";
   drawBar(225, 29, 165, 14, player.hp / state.itemStats.maxHp, "#ff7042", `${STR.hull}${shieldText}`);
   drawBar(225, 74, 165, 14, player.overdrive / 100, "#31eaff", STR.overdrive);
   ctx.textAlign = "right";
@@ -2005,24 +2092,38 @@ function drawHud() {
   ctx.fillStyle = "rgba(244, 251, 255, .72)";
   ctx.font = "700 13px Bahnschrift, sans-serif";
   ctx.fillText(STR[stage.nameKey], 690, 98);
+}
+
+function drawBossHud(stage, compact, left, right) {
   if (state.boss?.active) {
     const boss = state.boss;
-    drawBar(120, 135, 480, 18, boss.hp / boss.maxHp, "#ff5f34", STR[stage.bossKey]);
+    const x = compact ? left : 120;
+    const y = compact ? 157 : 135;
+    const width = compact ? right - left : 480;
+    drawBar(x, y, width, 18, boss.hp / boss.maxHp, "#ff5f34", STR[stage.bossKey]);
   }
+}
+
+function drawHudBanner(compact, left, right) {
   if (state.bannerTime > 0) {
     const alpha = Math.min(1, state.bannerTime * 1.8, (2.2 - state.bannerTime) * 2.5);
     ctx.globalAlpha = alpha;
     ctx.textAlign = "center";
     ctx.fillStyle = "#f4fbff";
-    ctx.font = "800 32px Bahnschrift, sans-serif";
-    ctx.fillText(state.banner, WORLD_W * 0.5, state.boss?.active ? 205 : 165);
+    ctx.font = compact ? "800 25px Bahnschrift, sans-serif" : "800 32px Bahnschrift, sans-serif";
+    const bannerX = compact ? (left + right) * 0.5 : WORLD_W * 0.5;
+    const bannerY = state.boss?.active ? compact ? 226 : 205 : compact ? 184 : 165;
+    ctx.fillText(state.banner, bannerX, bannerY);
     ctx.strokeStyle = "#31eaff";
     ctx.lineWidth = 3;
     ctx.beginPath();
-    ctx.moveTo(190, state.boss?.active ? 222 : 182);
-    ctx.lineTo(530, state.boss?.active ? 222 : 182);
+    ctx.moveTo(compact ? left + 52 : 190, bannerY + 17);
+    ctx.lineTo(compact ? right - 52 : 530, bannerY + 17);
     ctx.stroke();
   }
+}
+
+function drawHudIntro() {
   if (state.intro > 0) {
     const alpha = Math.min(1, state.intro * 2);
     ctx.globalAlpha = alpha;
@@ -2031,6 +2132,24 @@ function drawHud() {
     ctx.font = "800 40px Bahnschrift, sans-serif";
     ctx.fillText(STR.ready, WORLD_W * 0.5, WORLD_H * 0.48);
   }
+}
+
+function drawHud() {
+  const stage = getStage(state.stageIndex);
+  const compact = visibleWorld.width < 690;
+  const margin = compact ? 18 : 28;
+  const left = visibleWorld.left + margin;
+  const right = visibleWorld.right - margin;
+  const panelHeight = compact ? 132 : 108;
+  ctx.save();
+  ctx.fillStyle = "rgba(2, 9, 22, .62)";
+  ctx.fillRect(visibleWorld.left, 0, visibleWorld.width, panelHeight);
+  const shieldText = player.shield > 0 ? ` · ${"⬡".repeat(player.shield)}` : "";
+  if (compact) drawCompactHud(stage, left, right, shieldText);
+  else drawFullHud(stage, shieldText);
+  drawBossHud(stage, compact, left, right);
+  drawHudBanner(compact, left, right);
+  drawHudIntro();
   ctx.restore();
 }
 
@@ -2153,6 +2272,13 @@ function debugSnapshot() {
     kills: state.kills,
     activeEnemies,
     activeShots,
+    viewport: {
+      mode: viewportMode,
+      scale: Number(viewScale.toFixed(3)),
+      visibleWidth: Math.round(visibleWorld.width),
+      visibleHeight: Math.round(visibleWorld.height),
+      dpr,
+    },
   };
 }
 
