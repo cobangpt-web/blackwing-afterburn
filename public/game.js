@@ -10,6 +10,11 @@ import {
   getUpgradeChoices,
 } from "./campaign.js";
 import { calculateJoystickVector } from "./joystick.js";
+import {
+  findMissileTarget,
+  HOMING_MISSILE_SPEED,
+  steerMissile,
+} from "./missiles.js";
 import { drawLowerFieldShade, drawUpperFieldTint } from "./rendering.js";
 import { createViewportLayout, getTouchLeadWorld } from "./viewport.js";
 
@@ -1343,8 +1348,8 @@ function launchMissiles() {
       missile.active = true;
       missile.x = missile.px = player.x + (launched % 2 ? 28 : -28);
       missile.y = missile.py = player.y - 22;
-      missile.vx = (launched % 2 ? 1 : -1) * 120;
-      missile.vy = -330;
+      missile.vx = (launched % 2 ? 1 : -1) * 150;
+      missile.vy = -390;
       missile.life = 4;
       missile.target = target;
       missile.angle = -Math.PI * 0.5;
@@ -1360,7 +1365,7 @@ function launchMissiles() {
       missile.x = missile.px = player.x;
       missile.y = missile.py = player.y - 22;
       missile.vx = 0;
-      missile.vy = -430;
+      missile.vy = -HOMING_MISSILE_SPEED;
       missile.life = 3;
       missile.target = null;
       missile.angle = -Math.PI * 0.5;
@@ -1707,17 +1712,8 @@ function updateMissiles() {
     missile.px = missile.x;
     missile.py = missile.y;
     missile.life -= DT;
-    const target = missile.target;
-    if (target && target.active) {
-      const desired = Math.atan2(target.y - missile.y, target.x - missile.x);
-      let delta = desired - missile.angle;
-      while (delta > Math.PI) delta -= Math.PI * 2;
-      while (delta < -Math.PI) delta += Math.PI * 2;
-      missile.angle += Math.max(-0.13, Math.min(0.13, delta));
-      const speed = 490;
-      missile.vx += (Math.cos(missile.angle) * speed - missile.vx) * 0.14;
-      missile.vy += (Math.sin(missile.angle) * speed - missile.vy) * 0.14;
-    }
+    if (!missile.target?.active) missile.target = findMissileTarget(enemies, missile.x, missile.y);
+    steerMissile(missile, missile.target, DT);
     missile.x += missile.vx * DT;
     missile.y += missile.vy * DT;
     if (missile.life <= 0 || missile.y < -100 || missile.x < -100 || missile.x > WORLD_W + 100) {
@@ -1993,12 +1989,51 @@ function drawMissiles() {
     ctx.moveTo(missile.px, missile.py);
     ctx.lineTo(missile.x, missile.y);
   }
-  ctx.strokeStyle = "#ffd98b";
-  ctx.lineWidth = 8;
-  ctx.shadowBlur = 14;
-  ctx.shadowColor = "#ff6c24";
+  ctx.strokeStyle = "rgba(255, 112, 36, .48)";
+  ctx.lineWidth = 12;
+  ctx.shadowBlur = 18;
+  ctx.shadowColor = "#ff5424";
   ctx.stroke();
   ctx.shadowBlur = 0;
+
+  for (let i = 0; i < missiles.length; i += 1) {
+    const missile = missiles[i];
+    if (!missile.active) continue;
+    ctx.save();
+    ctx.translate(missile.x, missile.y);
+    ctx.rotate(missile.angle);
+    ctx.shadowBlur = 18;
+    ctx.shadowColor = "#ff6a24";
+
+    ctx.fillStyle = "#ff5b22";
+    ctx.beginPath();
+    ctx.moveTo(-8, -4);
+    ctx.lineTo(-20, 0);
+    ctx.lineTo(-8, 4);
+    ctx.closePath();
+    ctx.fill();
+
+    ctx.fillStyle = "#fff3bd";
+    ctx.beginPath();
+    ctx.moveTo(16, 0);
+    ctx.lineTo(-7, -7);
+    ctx.lineTo(-11, 0);
+    ctx.lineTo(-7, 7);
+    ctx.closePath();
+    ctx.fill();
+
+    ctx.strokeStyle = "#ffae3b";
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(-4, -6);
+    ctx.lineTo(-1, -13);
+    ctx.lineTo(5, -4);
+    ctx.moveTo(-4, 6);
+    ctx.lineTo(-1, 13);
+    ctx.lineTo(5, 4);
+    ctx.stroke();
+    ctx.restore();
+  }
 }
 
 function drawPickups() {
