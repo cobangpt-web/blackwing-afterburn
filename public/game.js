@@ -108,8 +108,6 @@ const briefingOverdriveKey = document.querySelector("#briefingOverdriveKey");
 const briefingPickupTitle = document.querySelector("#briefingPickupTitle");
 const briefingPickupDescription = document.querySelector("#briefingPickupDescription");
 const briefingPickupKey = document.querySelector("#briefingPickupKey");
-const briefingItemsTitle = document.querySelector("#briefingItemsTitle");
-const briefingItems = document.querySelector("#briefingItems");
 const briefingPickupsTitle = document.querySelector("#briefingPickupsTitle");
 const briefingPickups = document.querySelector("#briefingPickups");
 const briefingLaunchBtn = document.querySelector("#briefingLaunchBtn");
@@ -119,8 +117,6 @@ const itemGuideTitle = document.querySelector("#itemGuideTitle");
 const itemGuideLead = document.querySelector("#itemGuideLead");
 const itemGuidePickupTitle = document.querySelector("#itemGuidePickupTitle");
 const itemGuidePickups = document.querySelector("#itemGuidePickups");
-const itemGuideCoreTitle = document.querySelector("#itemGuideCoreTitle");
-const itemGuideCores = document.querySelector("#itemGuideCores");
 const itemGuideCloseBtn = document.querySelector("#itemGuideCloseBtn");
 const testStageButtons = [];
 let testInvincible = TEST_MODE;
@@ -156,7 +152,6 @@ briefingOverdriveKey.textContent = STR.briefingOverdriveKey;
 briefingPickupTitle.textContent = STR.briefingPickupTitle;
 briefingPickupDescription.textContent = STR.briefingPickupDescription;
 briefingPickupKey.textContent = STR.briefingPickupKey;
-briefingItemsTitle.textContent = STR.briefingItemsTitle;
 briefingPickupsTitle.textContent = STR.briefingPickupsTitle;
 briefingLaunchBtn.textContent = STR.briefingLaunch;
 briefingLaunchBtn.setAttribute("aria-label", STR.briefingLaunch);
@@ -164,7 +159,6 @@ itemGuideEyebrow.textContent = STR.itemGuideEyebrow;
 itemGuideTitle.textContent = STR.itemGuideTitle;
 itemGuideLead.textContent = STR.itemGuideLead;
 itemGuidePickupTitle.textContent = STR.itemGuidePickupTitle;
-itemGuideCoreTitle.textContent = STR.itemGuideCoreTitle;
 itemGuideCloseBtn.textContent = STR.itemGuideClose;
 itemGuideCloseBtn.setAttribute("aria-label", STR.itemGuideClose);
 document.querySelector("#resultStats").setAttribute("aria-label", STR.resultScore);
@@ -221,9 +215,7 @@ function createItemCards(catalog, copyCatalog) {
 }
 
 function renderBriefingItems() {
-  briefingItems.replaceChildren(createItemCards(ITEMS, STR.items));
   briefingPickups.replaceChildren(createItemCards(PICKUPS, STR.pickups));
-  itemGuideCores.replaceChildren(createItemCards(ITEMS, STR.items));
   itemGuidePickups.replaceChildren(createItemCards(PICKUPS, STR.pickups));
 }
 
@@ -1641,7 +1633,7 @@ function useStoredItem(slotIndex = 0) {
   }
 
   const copy = STR.pickups[itemId];
-  showActionFeedback(copy.name, STR.pickupUsedDetail, `pickup:${itemId}`);
+  showActionFeedback(copy.name, copy.description, `pickup:${itemId}`);
   audio.pickup();
   syncActionButtons(true);
   return true;
@@ -2082,7 +2074,7 @@ function updatePickups() {
       state.itemInventory.push(pickup.itemId);
       state.score += 250 * state.combo;
       const copy = STR.pickups[pickup.itemId];
-      showActionFeedback(copy.name, STR.pickupStoredDetail, `pickup:${pickup.itemId}`);
+      showActionFeedback(copy.name, copy.description, `pickup:${pickup.itemId}`);
       audio.pickup();
       syncActionButtons(true);
     } else if (distance < 35 && state.itemInventory.length >= MAX_INVENTORY) {

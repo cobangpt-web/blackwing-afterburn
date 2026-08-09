@@ -194,9 +194,7 @@
       font-weight: 800;
       letter-spacing: .06em;
     }
-    #briefingItems,
     #briefingPickups,
-    #itemGuideCores,
     #itemGuidePickups {
       display: grid;
       grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -789,9 +787,7 @@
         overflow-y: auto;
       }
       .briefing-controls { grid-template-columns: 1fr; }
-      #briefingItems,
       #briefingPickups,
-      #itemGuideCores,
       #itemGuidePickups { gap: 7px; }
       .briefing-item { padding: 10px; }
       .briefing-actions .primary { width: 100%; }
@@ -913,8 +909,6 @@
             <span id="briefingPickupKey" class="briefing-key"></span>
           </article>
         </div>
-        <h3 id="briefingItemsTitle" class="briefing-section-title"></h3>
-        <div id="briefingItems"></div>
         <h3 id="briefingPickupsTitle" class="briefing-section-title"></h3>
         <div id="briefingPickups"></div>
         <div class="briefing-actions">
@@ -933,8 +927,6 @@
         <p id="itemGuideLead" class="briefing-lead"></p>
         <h3 id="itemGuidePickupTitle" class="briefing-section-title"></h3>
         <div id="itemGuidePickups"></div>
-        <h3 id="itemGuideCoreTitle" class="briefing-section-title"></h3>
-        <div id="itemGuideCores"></div>
         <div class="briefing-actions">
           <button id="itemGuideCloseBtn" class="secondary" type="button"></button>
         </div>
