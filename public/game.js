@@ -344,7 +344,6 @@ const manifestAssets = {
 };
 const audioAssets = {
   combat_music: "./assets/audio/fight_looped.wav",
-  sfx_cannon: "./assets/audio/cannon.mp3",
   sfx_missile: "./assets/audio/rocket-launcher-307512.mp3",
   sfx_explosion: "synth",
   sfx_boost: "./assets/audio/boost.mp3",
@@ -410,7 +409,6 @@ class AudioEngine {
     this.sfx = null;
     this.musicElement = null;
     this.musicElementSource = null;
-    this.cannonBuffer = null;
     this.missileBuffer = null;
     this.boostBuffer = null;
     this.noiseBuffer = null;
@@ -422,17 +420,19 @@ class AudioEngine {
   async init() {
     if (this.ctx) {
       if (this.ctx.state === "suspended") await this.ctx.resume();
+      this.startMusic();
       return;
     }
     const AudioContextClass = window.AudioContext || window.webkitAudioContext;
     if (!AudioContextClass) return;
     this.ctx = new AudioContextClass();
+    this.ctx.resume().catch(() => {});
     this.master = this.ctx.createGain();
     this.music = this.ctx.createGain();
     this.musicFilter = this.ctx.createBiquadFilter();
     this.sfx = this.ctx.createGain();
     this.master.gain.value = settings.muted ? 0 : 0.72;
-    this.music.gain.value = 0.12;
+    this.music.gain.value = 0.2;
     this.musicFilter.type = "lowpass";
     this.musicFilter.frequency.value = 2200;
     this.musicFilter.Q.value = 0.45;
@@ -446,12 +446,18 @@ class AudioEngine {
     this.musicElement.volume = 1;
     this.musicElementSource = this.ctx.createMediaElementSource(this.musicElement);
     this.musicElementSource.connect(this.music);
+    this.startMusic();
     this.noiseBuffer = this.makeNoise();
-    const cannon = this.fetchBuffer(audioAssets.sfx_cannon);
     const missile = this.fetchBuffer(audioAssets.sfx_missile);
     const boost = this.fetchBuffer(audioAssets.sfx_boost);
-    [this.cannonBuffer, this.missileBuffer, this.boostBuffer] = await Promise.all([cannon, missile, boost]);
-    this.musicElement.play().catch(() => {});
+    [this.missileBuffer, this.boostBuffer] = await Promise.all([missile, boost]);
+    this.startMusic();
+  }
+
+  startMusic() {
+    if (!this.musicElement) return;
+    const playPromise = this.musicElement.play();
+    if (playPromise?.catch) playPromise.catch(() => {});
   }
 
   async fetchBuffer(url) {
@@ -484,7 +490,7 @@ class AudioEngine {
     if (!this.ctx || !this.music || !this.musicFilter) return;
     const now = this.ctx.currentTime;
     const values = {
-      running: { gain: 0.12, filter: 2200 },
+      running: { gain: 0.2, filter: 2200 },
       paused: { gain: 0.045, filter: 920 },
       defeat: { gain: 0.028, filter: 560 },
       victory: { gain: 0.07, filter: 1500 },
@@ -511,13 +517,25 @@ class AudioEngine {
   }
 
   cannon(gameTime) {
-    if (gameTime - this.lastCannonAt < 0.115) return;
+    if (gameTime - this.lastCannonAt < 0.14) return;
     this.lastCannonAt = gameTime;
-    if (this.cannonBuffer) {
-      this.playBuffer(this.cannonBuffer, 0.16, 0.95 + Math.random() * 0.08);
-    } else {
-      this.tone(145, 0.045, "square", 0.08, 62);
-    }
+    if (!this.ctx || !this.noiseBuffer || settings.muted) return;
+    const source = this.ctx.createBufferSource();
+    const highpass = this.ctx.createBiquadFilter();
+    const lowpass = this.ctx.createBiquadFilter();
+    const gain = this.ctx.createGain();
+    const now = this.ctx.currentTime;
+    source.buffer = this.noiseBuffer;
+    highpass.type = "highpass";
+    highpass.frequency.setValueAtTime(480, now);
+    lowpass.type = "lowpass";
+    lowpass.frequency.setValueAtTime(2600, now);
+    lowpass.frequency.exponentialRampToValueAtTime(820, now + 0.065);
+    gain.gain.setValueAtTime(0.1, now);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.075);
+    source.connect(highpass).connect(lowpass).connect(gain).connect(this.sfx);
+    source.start(now);
+    source.stop(now + 0.09);
   }
 
   missile() {
