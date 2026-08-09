@@ -87,6 +87,7 @@ const testDefeatBossBtn = document.querySelector("#testDefeatBossBtn");
 const testMaxCoresBtn = document.querySelector("#testMaxCoresBtn");
 const testInvincibleToggle = document.querySelector("#testInvincibleToggle");
 const testNotice = document.querySelector("#testNotice");
+const audioCreditsLabel = document.querySelector("#audioCreditsLabel");
 const testStageButtons = [];
 let testInvincible = TEST_MODE;
 let lastTestControlsKey = "";
@@ -107,6 +108,7 @@ boostBtn.setAttribute("aria-label", STR.boostButton);
 pauseBtn.setAttribute("aria-label", STR.pauseButton);
 document.querySelector("#controlsHelp").textContent =
   `${STR.controlsKeyboard} · ${STR.controlsTouch} · ${STR.controlsPad}`;
+audioCreditsLabel.textContent = STR.audioCreditsLabel;
 document.querySelector("#resultStats").setAttribute("aria-label", STR.resultScore);
 document.querySelector("#resultScoreLabel").textContent = STR.resultScore;
 document.querySelector("#resultBestLabel").textContent = STR.resultBest;
@@ -260,9 +262,9 @@ const manifestAssets = {
   favicon_emblem: "./assets/favicon_emblem.png",
 };
 const audioAssets = {
-  combat_music: "synth",
+  combat_music: "./assets/audio/fight_looped.wav",
   sfx_cannon: "./assets/audio/cannon.mp3",
-  sfx_missile: "synth",
+  sfx_missile: "./assets/audio/rocket-launcher-307512.mp3",
   sfx_explosion: "synth",
   sfx_boost: "./assets/audio/boost.mp3",
   sfx_warning: "synth",
@@ -325,7 +327,10 @@ class AudioEngine {
     this.music = null;
     this.musicFilter = null;
     this.sfx = null;
+    this.musicElement = null;
+    this.musicElementSource = null;
     this.cannonBuffer = null;
+    this.missileBuffer = null;
     this.boostBuffer = null;
     this.noiseBuffer = null;
     this.musicNodes = null;
@@ -354,11 +359,18 @@ class AudioEngine {
     this.music.connect(this.musicFilter).connect(this.master);
     this.sfx.connect(this.master);
     this.master.connect(this.ctx.destination);
+    this.musicElement = new Audio(audioAssets.combat_music);
+    this.musicElement.loop = true;
+    this.musicElement.preload = "auto";
+    this.musicElement.volume = 1;
+    this.musicElementSource = this.ctx.createMediaElementSource(this.musicElement);
+    this.musicElementSource.connect(this.music);
     this.noiseBuffer = this.makeNoise();
-    this.startMusic();
     const cannon = this.fetchBuffer(audioAssets.sfx_cannon);
+    const missile = this.fetchBuffer(audioAssets.sfx_missile);
     const boost = this.fetchBuffer(audioAssets.sfx_boost);
-    [this.cannonBuffer, this.boostBuffer] = await Promise.all([cannon, boost]);
+    [this.cannonBuffer, this.missileBuffer, this.boostBuffer] = await Promise.all([cannon, missile, boost]);
+    this.musicElement.play().catch(() => {});
   }
 
   async fetchBuffer(url) {
@@ -385,49 +397,7 @@ class AudioEngine {
     return buffer;
   }
 
-  startMusic() {
-    if (!this.ctx || this.musicNodes) return;
-    const bass = this.ctx.createOscillator();
-    const lead = this.ctx.createOscillator();
-    const air = this.ctx.createOscillator();
-    const bassGain = this.ctx.createGain();
-    const leadGain = this.ctx.createGain();
-    const airGain = this.ctx.createGain();
-    bass.type = "triangle";
-    lead.type = "sine";
-    air.type = "sine";
-    bass.detune.value = -5;
-    lead.detune.value = 4;
-    air.detune.value = -7;
-    bassGain.gain.value = 0.13;
-    leadGain.gain.value = 0.018;
-    airGain.gain.value = 0.016;
-    bass.connect(bassGain).connect(this.music);
-    lead.connect(leadGain).connect(this.music);
-    air.connect(airGain).connect(this.music);
-    bass.start();
-    lead.start();
-    air.start();
-    this.musicNodes = { bass, lead, air, bassGain, leadGain, airGain };
-  }
-
-  tick(gameTime, bossActive) {
-    if (!this.ctx || !this.musicNodes) return;
-    const beat = Math.floor(gameTime * 4);
-    if (beat === this.lastBeat) return;
-    this.lastBeat = beat;
-    const roots = bossActive ? [41.2, 46.25, 49, 55] : [55, 61.74, 65.41, 73.42];
-    const root = roots[(beat >> 2) % roots.length];
-    const bassPattern = [1, 1, 1.189, 1, 1.335, 1.189, 1, 0.891];
-    const leadPattern = [1.498, 1.335, 1.189, 1, 1.189, 1.335, 1.681, 1.498];
-    const now = this.ctx.currentTime;
-    this.musicNodes.bass.frequency.setTargetAtTime(root * bassPattern[beat % bassPattern.length], now, 0.055);
-    this.musicNodes.lead.frequency.setTargetAtTime(root * 4 * leadPattern[(beat + 2) % leadPattern.length], now, 0.04);
-    this.musicNodes.air.frequency.setTargetAtTime(root * 2, now, 0.12);
-    this.musicNodes.bassGain.gain.setValueAtTime(beat % 4 === 0 ? 0.15 : 0.095, now);
-    this.musicNodes.leadGain.gain.setValueAtTime(beat % 4 === 2 ? 0.04 : 0.012, now);
-    this.musicNodes.airGain.gain.setValueAtTime(bossActive ? 0.022 : 0.012, now);
-  }
+  tick() {}
 
   setMusicMode(mode = "running") {
     if (!this.ctx || !this.music || !this.musicFilter) return;
@@ -470,35 +440,7 @@ class AudioEngine {
   }
 
   missile() {
-    if (!this.ctx || !this.noiseBuffer || settings.muted) return;
-    const now = this.ctx.currentTime;
-    const whoosh = this.ctx.createBufferSource();
-    const filter = this.ctx.createBiquadFilter();
-    const whooshGain = this.ctx.createGain();
-    whoosh.buffer = this.noiseBuffer;
-    whoosh.playbackRate.value = 1.35;
-    filter.type = "bandpass";
-    filter.Q.value = 0.75;
-    filter.frequency.setValueAtTime(1500, now);
-    filter.frequency.exponentialRampToValueAtTime(220, now + 0.34);
-    whooshGain.gain.setValueAtTime(0.0001, now);
-    whooshGain.gain.linearRampToValueAtTime(0.12, now + 0.018);
-    whooshGain.gain.exponentialRampToValueAtTime(0.001, now + 0.36);
-    whoosh.connect(filter).connect(whooshGain).connect(this.sfx);
-    whoosh.start(now);
-    whoosh.stop(now + 0.38);
-
-    const lockTone = this.ctx.createOscillator();
-    const lockGain = this.ctx.createGain();
-    lockTone.type = "triangle";
-    lockTone.frequency.setValueAtTime(330, now);
-    lockTone.frequency.exponentialRampToValueAtTime(150, now + 0.26);
-    lockGain.gain.setValueAtTime(0.0001, now);
-    lockGain.gain.linearRampToValueAtTime(0.12, now + 0.012);
-    lockGain.gain.exponentialRampToValueAtTime(0.001, now + 0.29);
-    lockTone.connect(lockGain).connect(this.sfx);
-    lockTone.start(now);
-    lockTone.stop(now + 0.31);
+    this.playBuffer(this.missileBuffer, 0.62, 0.94 + Math.random() * 0.12);
   }
 
   boost() {

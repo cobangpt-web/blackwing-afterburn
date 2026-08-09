@@ -281,6 +281,20 @@
       font-size: 13px;
       line-height: 1.55;
     }
+    #audioCredits {
+      margin: 12px 0 0;
+      color: rgba(244, 251, 255, .46);
+      font-size: 11px;
+      line-height: 1.45;
+    }
+    #audioCredits a {
+      color: rgba(142, 245, 255, .74);
+      text-decoration: underline;
+      text-decoration-color: rgba(142, 245, 255, .34);
+      text-underline-offset: 2px;
+    }
+    #audioCredits a:hover,
+    #audioCredits a:focus-visible { color: var(--cyan-300); }
     #settingsPanel {
       margin-top: 16px;
       padding: 14px;
@@ -706,6 +720,13 @@
           <label class="setting"><input id="muteToggle" type="checkbox"><span id="muteLabel"></span></label>
         </div>
         <p id="controlsHelp"></p>
+        <p id="audioCredits">
+          <span id="audioCreditsLabel"></span>
+          <span aria-hidden="true"> · </span>
+          <a href="https://opengameart.org/content/fast-fight-battle-music-looped" target="_blank" rel="noreferrer noopener">BGM · Fast fight / battle music (CC0)</a>
+          <span aria-hidden="true"> · </span>
+          <a href="https://pixabay.com/sound-effects/film-special-effects-rocket-launcher-307512/" target="_blank" rel="noreferrer noopener">SFX · Rocket Launcher (Pixabay)</a>
+        </p>
       </div>
     </section>
     <section id="upgradePanel" aria-labelledby="upgradeTitle" hidden>
