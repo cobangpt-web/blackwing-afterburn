@@ -52,6 +52,24 @@ const TEST_BUILDS = [
   { spread: 1, railgun: 1, shield: 1, overdrive: 1 },
   { twinWing: 2, railgun: 1, wingman: 2, emp: 1, shield: 1, overdrive: 1 },
 ];
+const MISSILE_PALETTES = Object.freeze({
+  default: Object.freeze({
+    trail: "rgba(255, 112, 36, .48)",
+    glow: "#ff5424",
+    fin: "#ff5b22",
+    body: "#fff3bd",
+    outline: "#421609",
+    accent: "#ffae3b",
+  }),
+  canyon: Object.freeze({
+    trail: "rgba(49, 234, 255, .72)",
+    glow: "#31eaff",
+    fin: "#31eaff",
+    body: "#f2feff",
+    outline: "#062236",
+    accent: "#c9fbff",
+  }),
+});
 
 const canvas = document.querySelector("#game");
 const ctx = canvas.getContext("2d", { alpha: false, desynchronized: true });
@@ -2331,6 +2349,7 @@ function drawShots() {
 }
 
 function drawMissiles() {
+  const palette = state.stageIndex === 1 ? MISSILE_PALETTES.canyon : MISSILE_PALETTES.default;
   ctx.lineCap = "round";
   ctx.beginPath();
   for (let i = 0; i < missiles.length; i += 1) {
@@ -2339,10 +2358,21 @@ function drawMissiles() {
     ctx.moveTo(missile.px, missile.py);
     ctx.lineTo(missile.x, missile.y);
   }
-  ctx.strokeStyle = "rgba(255, 112, 36, .48)";
+  ctx.strokeStyle = "rgba(2, 9, 22, .78)";
+  ctx.lineWidth = 20;
+  ctx.shadowBlur = 0;
+  ctx.stroke();
+  ctx.beginPath();
+  for (let i = 0; i < missiles.length; i += 1) {
+    const missile = missiles[i];
+    if (!missile.active) continue;
+    ctx.moveTo(missile.px, missile.py);
+    ctx.lineTo(missile.x, missile.y);
+  }
+  ctx.strokeStyle = palette.trail;
   ctx.lineWidth = 12;
   ctx.shadowBlur = 18;
-  ctx.shadowColor = "#ff5424";
+  ctx.shadowColor = palette.glow;
   ctx.stroke();
   ctx.shadowBlur = 0;
 
@@ -2353,9 +2383,9 @@ function drawMissiles() {
     ctx.translate(missile.x, missile.y);
     ctx.rotate(missile.angle);
     ctx.shadowBlur = 18;
-    ctx.shadowColor = "#ff6a24";
+    ctx.shadowColor = palette.glow;
 
-    ctx.fillStyle = "#ff5b22";
+    ctx.fillStyle = palette.fin;
     ctx.beginPath();
     ctx.moveTo(-8, -4);
     ctx.lineTo(-20, 0);
@@ -2363,7 +2393,7 @@ function drawMissiles() {
     ctx.closePath();
     ctx.fill();
 
-    ctx.fillStyle = "#fff3bd";
+    ctx.fillStyle = palette.body;
     ctx.beginPath();
     ctx.moveTo(16, 0);
     ctx.lineTo(-7, -7);
@@ -2371,8 +2401,11 @@ function drawMissiles() {
     ctx.lineTo(-7, 7);
     ctx.closePath();
     ctx.fill();
+    ctx.strokeStyle = palette.outline;
+    ctx.lineWidth = 3;
+    ctx.stroke();
 
-    ctx.strokeStyle = "#ffae3b";
+    ctx.strokeStyle = palette.accent;
     ctx.lineWidth = 2;
     ctx.beginPath();
     ctx.moveTo(-4, -6);
