@@ -105,6 +105,125 @@
       backdrop-filter: blur(8px);
     }
     #upgradePanel[hidden] { display: none; }
+    #briefingPanel {
+      position: fixed;
+      inset: 0;
+      z-index: 20;
+      display: grid;
+      place-items: center;
+      padding: 24px;
+      background: rgba(1, 7, 17, .84);
+      backdrop-filter: blur(10px);
+    }
+    #briefingPanel[hidden] { display: none; }
+    .briefing-shell {
+      width: min(760px, 100%);
+      max-height: calc(100dvh - 48px - var(--safe-bottom));
+      overflow-y: auto;
+      padding: clamp(22px, 4vw, 36px);
+      border: 1px solid rgba(142, 245, 255, .34);
+      border-top: 3px solid var(--cyan-400);
+      background:
+        radial-gradient(circle at 88% 0%, rgba(49, 234, 255, .14), transparent 32%),
+        linear-gradient(145deg, rgba(8, 30, 50, .98), rgba(2, 9, 22, .98));
+      box-shadow: 0 28px 90px rgba(0, 0, 0, .64);
+    }
+    .briefing-header {
+      display: flex;
+      align-items: start;
+      justify-content: space-between;
+      gap: 18px;
+    }
+    .briefing-title {
+      margin: 0;
+      color: var(--white);
+      font-size: clamp(26px, 4vw, 42px);
+      letter-spacing: -.04em;
+    }
+    .briefing-lead {
+      margin: 8px 0 22px;
+      color: rgba(244, 251, 255, .7);
+      line-height: 1.5;
+    }
+    .briefing-section-title {
+      margin: 0 0 10px;
+      color: var(--cyan-300);
+      font-size: 14px;
+      letter-spacing: .15em;
+      text-transform: uppercase;
+    }
+    .briefing-controls {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px;
+      margin-bottom: 24px;
+    }
+    .briefing-tip {
+      min-width: 0;
+      padding: 13px 14px;
+      border: 1px solid rgba(142, 245, 255, .2);
+      background: rgba(2, 12, 25, .64);
+    }
+    .briefing-tip strong,
+    .briefing-tip span { display: block; }
+    .briefing-tip strong {
+      color: var(--white);
+      font-size: 14px;
+    }
+    .briefing-tip span {
+      margin-top: 5px;
+      color: rgba(244, 251, 255, .64);
+      font-size: 12px;
+      line-height: 1.45;
+    }
+    .briefing-key {
+      margin-top: 8px;
+      color: var(--orange-400) !important;
+      font-size: 12px !important;
+      font-weight: 800;
+      letter-spacing: .06em;
+    }
+    #briefingItems {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 8px;
+      margin-bottom: 24px;
+    }
+    .briefing-item {
+      min-width: 0;
+      padding: 11px 12px;
+      border: 1px solid rgba(142, 245, 255, .16);
+      background: linear-gradient(145deg, rgba(13, 43, 64, .72), rgba(2, 12, 25, .7));
+    }
+    .briefing-item-heading {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .briefing-item-icon {
+      min-width: 31px;
+      color: var(--orange-400);
+      font-size: 19px;
+      font-weight: 800;
+      line-height: 1;
+      text-align: center;
+    }
+    .briefing-item-name {
+      color: var(--white);
+      font-size: 13px;
+      font-weight: 800;
+    }
+    .briefing-item-description {
+      display: block;
+      margin-top: 7px;
+      color: rgba(244, 251, 255, .62);
+      font-size: 11px;
+      line-height: 1.42;
+    }
+    .briefing-actions {
+      display: flex;
+      justify-content: flex-end;
+    }
     .upgrade-shell {
       width: min(920px, 100%);
       padding: clamp(20px, 4vw, 40px);
@@ -570,6 +689,14 @@
         align-items: end;
         padding: 14px 12px calc(14px + var(--safe-bottom));
       }
+      #briefingPanel {
+        align-items: end;
+        padding: 12px 12px calc(12px + var(--safe-bottom));
+      }
+      .briefing-shell {
+        max-height: calc(100dvh - 24px - var(--safe-bottom));
+        padding: 20px 16px;
+      }
       .upgrade-shell { padding: 20px 16px; }
       #upgradeChoices {
         grid-template-columns: 1fr;
@@ -647,6 +774,10 @@
         max-height: 30dvh;
         overflow-y: auto;
       }
+      .briefing-controls { grid-template-columns: 1fr; }
+      #briefingItems { gap: 7px; }
+      .briefing-item { padding: 10px; }
+      .briefing-actions .primary { width: 100%; }
     }
     @media (max-height: 560px) and (orientation: landscape) {
       .panel {
@@ -735,6 +866,35 @@
         <h2 id="upgradeTitle" class="upgrade-title"></h2>
         <p id="upgradeHint" class="upgrade-hint"></p>
         <div id="upgradeChoices"></div>
+      </div>
+    </section>
+    <section id="briefingPanel" aria-labelledby="briefingTitle" aria-modal="true" hidden>
+      <div class="briefing-shell" role="dialog">
+        <div class="briefing-header">
+          <div>
+            <p id="briefingEyebrow" class="eyebrow"></p>
+            <h2 id="briefingTitle" class="briefing-title"></h2>
+          </div>
+        </div>
+        <p id="briefingLead" class="briefing-lead"></p>
+        <h3 id="briefingControlsTitle" class="briefing-section-title"></h3>
+        <div class="briefing-controls">
+          <article class="briefing-tip">
+            <strong id="briefingMissileTitle"></strong>
+            <span id="briefingMissileDescription"></span>
+            <span id="briefingMissileKey" class="briefing-key"></span>
+          </article>
+          <article class="briefing-tip">
+            <strong id="briefingOverdriveTitle"></strong>
+            <span id="briefingOverdriveDescription"></span>
+            <span id="briefingOverdriveKey" class="briefing-key"></span>
+          </article>
+        </div>
+        <h3 id="briefingItemsTitle" class="briefing-section-title"></h3>
+        <div id="briefingItems"></div>
+        <div class="briefing-actions">
+          <button id="briefingLaunchBtn" class="primary" type="button"></button>
+        </div>
       </div>
     </section>
     <div id="dev"></div>

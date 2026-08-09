@@ -40,6 +40,7 @@ const MAX_PICKUPS = 24;
 const MAX_EFFECTS = 24;
 const LOCK_DASH = [8, 9];
 const EMPTY_DASH = [];
+const BRIEFING_SEEN_KEY = "bw-briefing-seen";
 const TEST_BUILDS = [
   {},
   { twinWing: 1 },
@@ -88,6 +89,21 @@ const testMaxCoresBtn = document.querySelector("#testMaxCoresBtn");
 const testInvincibleToggle = document.querySelector("#testInvincibleToggle");
 const testNotice = document.querySelector("#testNotice");
 const audioCreditsLabel = document.querySelector("#audioCreditsLabel");
+const briefingPanel = document.querySelector("#briefingPanel");
+const briefingShell = document.querySelector(".briefing-shell");
+const briefingEyebrow = document.querySelector("#briefingEyebrow");
+const briefingTitle = document.querySelector("#briefingTitle");
+const briefingLead = document.querySelector("#briefingLead");
+const briefingControlsTitle = document.querySelector("#briefingControlsTitle");
+const briefingMissileTitle = document.querySelector("#briefingMissileTitle");
+const briefingMissileDescription = document.querySelector("#briefingMissileDescription");
+const briefingMissileKey = document.querySelector("#briefingMissileKey");
+const briefingOverdriveTitle = document.querySelector("#briefingOverdriveTitle");
+const briefingOverdriveDescription = document.querySelector("#briefingOverdriveDescription");
+const briefingOverdriveKey = document.querySelector("#briefingOverdriveKey");
+const briefingItemsTitle = document.querySelector("#briefingItemsTitle");
+const briefingItems = document.querySelector("#briefingItems");
+const briefingLaunchBtn = document.querySelector("#briefingLaunchBtn");
 const testStageButtons = [];
 let testInvincible = TEST_MODE;
 let lastTestControlsKey = "";
@@ -109,6 +125,19 @@ pauseBtn.setAttribute("aria-label", STR.pauseButton);
 document.querySelector("#controlsHelp").textContent =
   `${STR.controlsKeyboard} · ${STR.controlsTouch} · ${STR.controlsPad}`;
 audioCreditsLabel.textContent = STR.audioCreditsLabel;
+briefingEyebrow.textContent = STR.briefingEyebrow;
+briefingTitle.textContent = STR.briefingTitle;
+briefingLead.textContent = STR.briefingLead;
+briefingControlsTitle.textContent = STR.briefingControlsTitle;
+briefingMissileTitle.textContent = STR.briefingMissileTitle;
+briefingMissileDescription.textContent = STR.briefingMissileDescription;
+briefingMissileKey.textContent = STR.briefingMissileKey;
+briefingOverdriveTitle.textContent = STR.briefingOverdriveTitle;
+briefingOverdriveDescription.textContent = STR.briefingOverdriveDescription;
+briefingOverdriveKey.textContent = STR.briefingOverdriveKey;
+briefingItemsTitle.textContent = STR.briefingItemsTitle;
+briefingLaunchBtn.textContent = STR.briefingLaunch;
+briefingLaunchBtn.setAttribute("aria-label", STR.briefingLaunch);
 document.querySelector("#resultStats").setAttribute("aria-label", STR.resultScore);
 document.querySelector("#resultScoreLabel").textContent = STR.resultScore;
 document.querySelector("#resultBestLabel").textContent = STR.resultBest;
@@ -130,6 +159,58 @@ testMaxCoresBtn.textContent = STR.testMaxCores;
 testNotice.textContent = STR.testOnly;
 testToggleBtn.setAttribute("aria-label", STR.testClose);
 testInvincibleToggle.checked = testInvincible;
+
+function renderBriefingItems() {
+  const fragment = document.createDocumentFragment();
+  for (const [itemId, item] of Object.entries(ITEMS)) {
+    const copy = STR.items[itemId];
+    if (!copy) continue;
+    const card = document.createElement("article");
+    card.className = "briefing-item";
+    card.setAttribute("aria-label", `${copy.name}. ${copy.description}`);
+
+    const heading = document.createElement("div");
+    heading.className = "briefing-item-heading";
+    const icon = document.createElement("span");
+    icon.className = "briefing-item-icon";
+    icon.textContent = item.icon;
+    icon.setAttribute("aria-hidden", "true");
+    const name = document.createElement("strong");
+    name.className = "briefing-item-name";
+    name.textContent = copy.name;
+    heading.append(icon, name);
+
+    const description = document.createElement("span");
+    description.className = "briefing-item-description";
+    description.textContent = copy.description;
+    card.append(heading, description);
+    fragment.append(card);
+  }
+  briefingItems.replaceChildren(fragment);
+}
+
+function showBriefing() {
+  briefingPanel.hidden = false;
+  briefingShell.scrollTop = 0;
+  briefingLaunchBtn.focus({ preventScroll: true });
+  requestAnimationFrame(() => {
+    briefingShell.scrollTop = 0;
+  });
+}
+
+function hideBriefing() {
+  briefingPanel.hidden = true;
+}
+
+function hasSeenBriefing() {
+  return localStorage.getItem(BRIEFING_SEEN_KEY) === "1";
+}
+
+function rememberBriefing() {
+  localStorage.setItem(BRIEFING_SEEN_KEY, "1");
+}
+
+renderBriefingItems();
 
 if (TEST_MODE) {
   testToggleBtn.hidden = false;
@@ -1315,7 +1396,7 @@ function togglePause() {
   }
 }
 
-startBtn.addEventListener("click", async () => {
+async function launchGame() {
   if (!assetsReady) return;
   if (assetFailure) {
     await loadAssets();
@@ -1324,7 +1405,28 @@ startBtn.addEventListener("click", async () => {
   await audio.init();
   if (state.mode === "paused") togglePause();
   else resetGame();
+}
+
+startBtn.addEventListener("click", async () => {
+  if (state.mode === "start" && !hasSeenBriefing() && !assetFailure) {
+    showBriefing();
+    return;
+  }
+  await launchGame();
 });
+
+briefingLaunchBtn.addEventListener("click", async () => {
+  rememberBriefing();
+  hideBriefing();
+  await launchGame();
+});
+
+document.addEventListener("keydown", (event) => {
+  if (event.key !== "Escape" || briefingPanel.hidden) return;
+  hideBriefing();
+  startBtn.focus();
+});
+
 restartBtn.addEventListener("click", resetGame);
 
 function refreshLocks() {
