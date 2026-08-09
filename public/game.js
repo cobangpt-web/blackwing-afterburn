@@ -75,7 +75,6 @@ const hudButtons = document.querySelector("#hudButtons");
 const moveStick = document.querySelector("#moveStick");
 const missileBtn = document.querySelector("#missileBtn");
 const boostBtn = document.querySelector("#boostBtn");
-const itemBtn = document.querySelector("#itemBtn");
 const pauseBtn = document.querySelector("#pauseBtn");
 const devPanel = document.querySelector("#dev");
 const statusLive = document.querySelector("#status");
@@ -650,6 +649,7 @@ const input = {
   missileEdge: false,
   boostEdge: false,
   itemEdge: false,
+  itemSlot: -1,
   pauseEdge: false,
   pointer: false,
   pointerTouch: false,
@@ -661,6 +661,7 @@ const input = {
   injectedMissile: false,
   injectedBoost: false,
   injectedItem: false,
+  injectedItemSlot: 0,
 };
 
 let activePointerId = null;
@@ -691,6 +692,8 @@ function releaseTransientInput() {
   input.injectedMissile = false;
   input.injectedBoost = false;
   input.injectedItem = false;
+  input.itemSlot = -1;
+  input.injectedItemSlot = 0;
   activePointerId = null;
   activeTouchLead = 0;
   resetMoveStick();
@@ -724,8 +727,9 @@ addEventListener("keydown", (event) => {
     input.boostEdge = true;
     event.preventDefault();
   }
-  if (!event.repeat && event.code === "KeyE") {
+  if (!event.repeat && (event.code === "Digit1" || event.code === "Numpad1" || event.code === "Digit2" || event.code === "Numpad2")) {
     input.itemEdge = true;
+    input.itemSlot = event.code.endsWith("1") ? 0 : 1;
     event.preventDefault();
   }
   if (!event.repeat && event.code === "Escape") {
@@ -841,11 +845,6 @@ boostBtn.addEventListener("pointerdown", (event) => {
   event.stopPropagation();
   event.preventDefault();
 });
-itemBtn.addEventListener("pointerdown", (event) => {
-  input.itemEdge = true;
-  event.stopPropagation();
-  event.preventDefault();
-});
 pauseBtn.addEventListener("click", () => { input.pauseEdge = true; });
 
 let padMissileWasDown = false;
@@ -875,7 +874,10 @@ function pollGamepad() {
     const pauseDown = Boolean(gp.buttons[9]?.pressed);
     if (missileDown && !padMissileWasDown) input.missileEdge = true;
     if (boostDown && !padBoostWasDown) input.boostEdge = true;
-    if (itemDown && !padItemWasDown) input.itemEdge = true;
+    if (itemDown && !padItemWasDown) {
+      input.itemEdge = true;
+      input.itemSlot = 0;
+    }
     if (pauseDown && !padPauseWasDown) input.pauseEdge = true;
     padMissileWasDown = missileDown;
     padBoostWasDown = boostDown;
@@ -973,7 +975,6 @@ const state = {
 
 let lastMissileButtonKey = "";
 let lastBoostButtonKey = "";
-let lastItemButtonKey = "";
 
 function syncActionButtons(force = false) {
   const missileKey = `${state.mode}:${player.missileCharges}`;
@@ -1004,18 +1005,6 @@ function syncActionButtons(force = false) {
     boostBtn.setAttribute("aria-label", label);
   }
 
-  const storedItem = state.itemInventory[0];
-  const itemKey = `${state.mode}:${state.itemInventory.join(",")}`;
-  if (force || itemKey !== lastItemButtonKey) {
-    lastItemButtonKey = itemKey;
-    const copy = storedItem ? STR.pickups[storedItem] : null;
-    const label = copy ? `${copy.name} (${state.itemInventory.length})` : STR.itemUnavailable;
-    itemBtn.disabled = state.mode !== "running" || !storedItem;
-    itemBtn.dataset.ready = String(Boolean(storedItem && state.mode === "running"));
-    itemBtn.textContent = storedItem ? `${PICKUPS[storedItem].icon} ${state.itemInventory.length}` : STR.itemButton;
-    itemBtn.title = label;
-    itemBtn.setAttribute("aria-label", label);
-  }
 }
 
 function rand() {
@@ -1579,14 +1568,16 @@ function clearHostileShots() {
   }
 }
 
-function useStoredItem() {
+function useStoredItem(slotIndex = 0) {
   if (state.mode !== "running") return false;
-  const itemId = state.itemInventory.shift();
+  const safeSlot = Number.isInteger(slotIndex) ? slotIndex : 0;
+  const itemId = state.itemInventory[safeSlot];
   if (!itemId || !PICKUPS[itemId]) {
     statusLive.textContent = STR.itemUnavailable;
     syncActionButtons(true);
     return false;
   }
+  state.itemInventory.splice(safeSlot, 1);
 
   if (itemId === "shieldCell") {
     player.shield = Math.min(3, player.shield + 1);
@@ -1834,10 +1825,12 @@ function updatePlayer() {
   }
   if (input.missileEdge || input.injectedMissile) launchMissiles();
   if (input.boostEdge || input.injectedBoost) activateOverdrive();
-  if (input.itemEdge || input.injectedItem) useStoredItem();
+  if (input.itemEdge) useStoredItem(input.itemSlot);
+  else if (input.injectedItem) useStoredItem(input.injectedItemSlot);
   input.injectedMissile = false;
   input.injectedBoost = false;
   input.injectedItem = false;
+  input.injectedItemSlot = 0;
 }
 
 function updateBoss(enemy) {
@@ -2538,10 +2531,15 @@ function drawInventoryHud(compact, left) {
   ctx.fillStyle = "rgba(244, 251, 255, .62)";
   ctx.font = compact ? "800 10px Bahnschrift, sans-serif" : "800 12px Bahnschrift, sans-serif";
   ctx.fillText(`${STR.itemInventory} ${state.itemInventory.length}/${MAX_INVENTORY}`, left, y);
+  const slotStart = compact ? 94 : 116;
+  const slotGap = compact ? 28 : 38;
+  ctx.textAlign = "center";
   for (let index = 0; index < MAX_INVENTORY; index += 1) {
     const itemId = state.itemInventory[index];
-    const x = left + (compact ? 66 : 88) + index * (compact ? 26 : 34);
+    const x = left + slotStart + index * slotGap;
     ctx.fillStyle = itemId ? PICKUPS[itemId].accent : "rgba(142, 245, 255, .22)";
+    ctx.font = compact ? "900 9px Bahnschrift, sans-serif" : "900 10px Bahnschrift, sans-serif";
+    ctx.fillText(String(index + 1), x, y - 13);
     ctx.font = compact ? "900 15px Bahnschrift, sans-serif" : "900 18px Bahnschrift, sans-serif";
     ctx.fillText(itemId ? PICKUPS[itemId].icon : "·", x, y);
   }
@@ -2810,7 +2808,10 @@ window.__BLACKWING__ = {
   start: resetGame,
   injectCommand(command) {
     if (command === "missile") input.injectedMissile = true;
-    if (command === "item") input.injectedItem = true;
+    if (command === "item" || command === "item1" || command === "item2") {
+      input.injectedItem = true;
+      input.injectedItemSlot = command === "item2" ? 1 : 0;
+    }
     if (command === "boost") {
       player.overdrive = 100;
       input.injectedBoost = true;
