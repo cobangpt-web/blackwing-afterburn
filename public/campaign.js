@@ -1,5 +1,16 @@
 export const MAX_ITEM_LEVEL = 3;
 
+export const PICKUPS = Object.freeze({
+  shieldCell: { icon: "⬡", accent: "#8ef5ff" },
+  repair: { icon: "✚", accent: "#7dff97" },
+  empBurst: { icon: "◉", accent: "#d66cff" },
+  missileCache: { icon: "◆", accent: "#ff9a45" },
+  lockBoost: { icon: "◎", accent: "#ffe15b" },
+  overdriveCell: { icon: "✦", accent: "#31eaff" },
+  timeWarp: { icon: "◌", accent: "#a8b6ff" },
+  omegaBomb: { icon: "✹", accent: "#ff5f43" },
+});
+
 export const STAGES = Object.freeze([
   {
     id: "tempest",
@@ -13,6 +24,7 @@ export const STAGES = Object.freeze([
     difficulty: 1,
     accent: "#31eaff",
     itemPool: ["twinWing", "homing", "shield", "armor"],
+    pickupPool: ["shieldCell", "repair", "missileCache"],
   },
   {
     id: "canyon",
@@ -26,6 +38,7 @@ export const STAGES = Object.freeze([
     difficulty: 1.14,
     accent: "#ff9a45",
     itemPool: ["spread", "railgun", "armor", "homing"],
+    pickupPool: ["empBurst", "missileCache", "repair"],
   },
   {
     id: "neon",
@@ -39,6 +52,7 @@ export const STAGES = Object.freeze([
     difficulty: 1.28,
     accent: "#d66cff",
     itemPool: ["wingman", "emp", "homing", "spread"],
+    pickupPool: ["lockBoost", "overdriveCell", "empBurst"],
   },
   {
     id: "boreal",
@@ -52,6 +66,7 @@ export const STAGES = Object.freeze([
     difficulty: 1.42,
     accent: "#a8ddff",
     itemPool: ["railgun", "shield", "overdrive", "wingman"],
+    pickupPool: ["timeWarp", "shieldCell", "lockBoost"],
   },
   {
     id: "erebus",
@@ -65,6 +80,7 @@ export const STAGES = Object.freeze([
     difficulty: 1.62,
     accent: "#ff4f43",
     itemPool: ["emp", "overdrive", "railgun", "spread"],
+    pickupPool: ["omegaBomb", "overdriveCell", "missileCache"],
   },
 ]);
 
@@ -82,6 +98,11 @@ export const ITEMS = Object.freeze({
 
 export function getStage(index) {
   return STAGES[Math.max(0, Math.min(STAGES.length - 1, index))];
+}
+
+export function getRandomPickupId(index, random = Math.random) {
+  const pool = getStage(index).pickupPool;
+  return pool[Math.min(pool.length - 1, Math.floor(random() * pool.length))];
 }
 
 export function getBossTime(index, quick = false) {

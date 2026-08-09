@@ -1,11 +1,13 @@
 import { STR } from "./strings.js";
 import {
   ITEMS,
+  PICKUPS,
   STAGES,
   applyItemLevel,
   createItemLevels,
   getBossTime,
   getItemStats,
+  getRandomPickupId,
   getStage,
   getUpgradeChoices,
 } from "./campaign.js";
@@ -38,6 +40,7 @@ const MAX_SHOTS = 220;
 const MAX_MISSILES = 12;
 const MAX_PICKUPS = 24;
 const MAX_EFFECTS = 24;
+const MAX_INVENTORY = 2;
 const LOCK_DASH = [8, 9];
 const EMPTY_DASH = [];
 const BRIEFING_SEEN_KEY = "bw-briefing-seen";
@@ -72,6 +75,7 @@ const hudButtons = document.querySelector("#hudButtons");
 const moveStick = document.querySelector("#moveStick");
 const missileBtn = document.querySelector("#missileBtn");
 const boostBtn = document.querySelector("#boostBtn");
+const itemBtn = document.querySelector("#itemBtn");
 const pauseBtn = document.querySelector("#pauseBtn");
 const devPanel = document.querySelector("#dev");
 const statusLive = document.querySelector("#status");
@@ -101,8 +105,13 @@ const briefingMissileKey = document.querySelector("#briefingMissileKey");
 const briefingOverdriveTitle = document.querySelector("#briefingOverdriveTitle");
 const briefingOverdriveDescription = document.querySelector("#briefingOverdriveDescription");
 const briefingOverdriveKey = document.querySelector("#briefingOverdriveKey");
+const briefingPickupTitle = document.querySelector("#briefingPickupTitle");
+const briefingPickupDescription = document.querySelector("#briefingPickupDescription");
+const briefingPickupKey = document.querySelector("#briefingPickupKey");
 const briefingItemsTitle = document.querySelector("#briefingItemsTitle");
 const briefingItems = document.querySelector("#briefingItems");
+const briefingPickupsTitle = document.querySelector("#briefingPickupsTitle");
+const briefingPickups = document.querySelector("#briefingPickups");
 const briefingLaunchBtn = document.querySelector("#briefingLaunchBtn");
 const testStageButtons = [];
 let testInvincible = TEST_MODE;
@@ -135,7 +144,11 @@ briefingMissileKey.textContent = STR.briefingMissileKey;
 briefingOverdriveTitle.textContent = STR.briefingOverdriveTitle;
 briefingOverdriveDescription.textContent = STR.briefingOverdriveDescription;
 briefingOverdriveKey.textContent = STR.briefingOverdriveKey;
+briefingPickupTitle.textContent = STR.briefingPickupTitle;
+briefingPickupDescription.textContent = STR.briefingPickupDescription;
+briefingPickupKey.textContent = STR.briefingPickupKey;
 briefingItemsTitle.textContent = STR.briefingItemsTitle;
+briefingPickupsTitle.textContent = STR.briefingPickupsTitle;
 briefingLaunchBtn.textContent = STR.briefingLaunch;
 briefingLaunchBtn.setAttribute("aria-label", STR.briefingLaunch);
 document.querySelector("#resultStats").setAttribute("aria-label", STR.resultScore);
@@ -187,6 +200,33 @@ function renderBriefingItems() {
     fragment.append(card);
   }
   briefingItems.replaceChildren(fragment);
+
+  const pickupFragment = document.createDocumentFragment();
+  for (const [pickupId, pickup] of Object.entries(PICKUPS)) {
+    const copy = STR.pickups[pickupId];
+    if (!copy) continue;
+    const card = document.createElement("article");
+    card.className = "briefing-item";
+    card.setAttribute("aria-label", `${copy.name}. ${copy.description}`);
+
+    const heading = document.createElement("div");
+    heading.className = "briefing-item-heading";
+    const icon = document.createElement("span");
+    icon.className = "briefing-item-icon";
+    icon.textContent = pickup.icon;
+    icon.setAttribute("aria-hidden", "true");
+    const name = document.createElement("strong");
+    name.className = "briefing-item-name";
+    name.textContent = copy.name;
+    heading.append(icon, name);
+
+    const description = document.createElement("span");
+    description.className = "briefing-item-description";
+    description.textContent = copy.description;
+    card.append(heading, description);
+    pickupFragment.append(card);
+  }
+  briefingPickups.replaceChildren(pickupFragment);
 }
 
 function showBriefing() {
@@ -609,6 +649,7 @@ const input = {
   right: false,
   missileEdge: false,
   boostEdge: false,
+  itemEdge: false,
   pauseEdge: false,
   pointer: false,
   pointerTouch: false,
@@ -619,6 +660,7 @@ const input = {
   targetY: WORLD_H * 0.82,
   injectedMissile: false,
   injectedBoost: false,
+  injectedItem: false,
 };
 
 let activePointerId = null;
@@ -642,11 +684,13 @@ function releaseTransientInput() {
   input.right = false;
   input.missileEdge = false;
   input.boostEdge = false;
+  input.itemEdge = false;
   input.pauseEdge = false;
   input.pointer = false;
   input.pointerTouch = false;
   input.injectedMissile = false;
   input.injectedBoost = false;
+  input.injectedItem = false;
   activePointerId = null;
   activeTouchLead = 0;
   resetMoveStick();
@@ -678,6 +722,10 @@ addEventListener("keydown", (event) => {
   }
   if (!event.repeat && (event.code === "ShiftLeft" || event.code === "ShiftRight" || event.code === "KeyX")) {
     input.boostEdge = true;
+    event.preventDefault();
+  }
+  if (!event.repeat && event.code === "KeyE") {
+    input.itemEdge = true;
     event.preventDefault();
   }
   if (!event.repeat && event.code === "Escape") {
@@ -793,10 +841,16 @@ boostBtn.addEventListener("pointerdown", (event) => {
   event.stopPropagation();
   event.preventDefault();
 });
+itemBtn.addEventListener("pointerdown", (event) => {
+  input.itemEdge = true;
+  event.stopPropagation();
+  event.preventDefault();
+});
 pauseBtn.addEventListener("click", () => { input.pauseEdge = true; });
 
 let padMissileWasDown = false;
 let padBoostWasDown = false;
+let padItemWasDown = false;
 let padPauseWasDown = false;
 let padX = 0;
 let padY = 0;
@@ -817,18 +871,22 @@ function pollGamepad() {
     padY = ay + (gp.buttons[13]?.pressed ? 1 : 0) - (gp.buttons[12]?.pressed ? 1 : 0);
     const missileDown = Boolean(gp.buttons[0]?.pressed);
     const boostDown = Boolean(gp.buttons[1]?.pressed || gp.buttons[7]?.pressed);
+    const itemDown = Boolean(gp.buttons[2]?.pressed);
     const pauseDown = Boolean(gp.buttons[9]?.pressed);
     if (missileDown && !padMissileWasDown) input.missileEdge = true;
     if (boostDown && !padBoostWasDown) input.boostEdge = true;
+    if (itemDown && !padItemWasDown) input.itemEdge = true;
     if (pauseDown && !padPauseWasDown) input.pauseEdge = true;
     padMissileWasDown = missileDown;
     padBoostWasDown = boostDown;
+    padItemWasDown = itemDown;
     padPauseWasDown = pauseDown;
     break;
   }
   if (!foundPad) {
     padMissileWasDown = false;
     padBoostWasDown = false;
+    padItemWasDown = false;
     padPauseWasDown = false;
   }
 }
@@ -849,7 +907,7 @@ function makeMissile() {
   return { active: false, x: 0, y: 0, px: 0, py: 0, vx: 0, vy: 0, life: 0, target: null, angle: 0 };
 }
 function makePickup() {
-  return { active: false, x: 0, y: 0, vx: 0, vy: 0, life: 0, phase: 0 };
+  return { active: false, itemId: "", x: 0, y: 0, vx: 0, vy: 0, life: 0, phase: 0 };
 }
 function makeEffect() {
   return { active: false, x: 0, y: 0, age: 0, duration: 0.5, scale: 1, angle: 0 };
@@ -898,6 +956,9 @@ const state = {
   actionFeedbackDetail: "",
   actionFeedbackKind: "",
   actionFeedbackTime: 0,
+  itemInventory: [],
+  lockBoostTime: 0,
+  timeWarpTime: 0,
   shake: 0,
   flash: 0,
   lockRefresh: 0,
@@ -912,6 +973,7 @@ const state = {
 
 let lastMissileButtonKey = "";
 let lastBoostButtonKey = "";
+let lastItemButtonKey = "";
 
 function syncActionButtons(force = false) {
   const missileKey = `${state.mode}:${player.missileCharges}`;
@@ -941,6 +1003,19 @@ function syncActionButtons(force = false) {
     boostBtn.title = label;
     boostBtn.setAttribute("aria-label", label);
   }
+
+  const storedItem = state.itemInventory[0];
+  const itemKey = `${state.mode}:${state.itemInventory.join(",")}`;
+  if (force || itemKey !== lastItemButtonKey) {
+    lastItemButtonKey = itemKey;
+    const copy = storedItem ? STR.pickups[storedItem] : null;
+    const label = copy ? `${copy.name} (${state.itemInventory.length})` : STR.itemUnavailable;
+    itemBtn.disabled = state.mode !== "running" || !storedItem;
+    itemBtn.dataset.ready = String(Boolean(storedItem && state.mode === "running"));
+    itemBtn.textContent = storedItem ? `${PICKUPS[storedItem].icon} ${state.itemInventory.length}` : STR.itemButton;
+    itemBtn.title = label;
+    itemBtn.setAttribute("aria-label", label);
+  }
 }
 
 function rand() {
@@ -953,7 +1028,10 @@ function rand() {
 }
 
 function clearPool(pool) {
-  for (let i = 0; i < pool.length; i += 1) pool[i].active = false;
+  for (let i = 0; i < pool.length; i += 1) {
+    pool[i].active = false;
+    if ("itemId" in pool[i]) pool[i].itemId = "";
+  }
 }
 
 function spawnEnemy(type, x, y, phase = 0) {
@@ -1039,14 +1117,16 @@ function spawnPickup(x, y) {
     const pickup = pickups[i];
     if (pickup.active) continue;
     pickup.active = true;
+    pickup.itemId = getRandomPickupId(state.stageIndex, rand);
     pickup.x = x;
     pickup.y = y;
     pickup.vx = (rand() - 0.5) * 55;
     pickup.vy = 80 + rand() * 45;
     pickup.life = 8;
     pickup.phase = rand() * Math.PI * 2;
-    return;
+    return pickup;
   }
+  return null;
 }
 
 function aimedVelocity(fromX, fromY, toX, toY, speed) {
@@ -1350,6 +1430,9 @@ function resetGame() {
   state.actionFeedbackDetail = "";
   state.actionFeedbackKind = "";
   state.actionFeedbackTime = 0;
+  state.itemInventory = [];
+  state.lockBoostTime = 0;
+  state.timeWarpTime = 0;
   state.shake = 0;
   state.flash = 0;
   state.lockRefresh = 0;
@@ -1466,7 +1549,7 @@ restartBtn.addEventListener("click", resetGame);
 function refreshLocks() {
   for (let i = 0; i < lockTargets.length; i += 1) lockTargets[i] = null;
   let filled = 0;
-  const lockLimit = state.itemStats.missileLocks;
+  const lockLimit = Math.min(7, state.itemStats.missileLocks + (state.lockBoostTime > 0 ? 3 : 0));
   for (let pass = 0; pass < lockLimit; pass += 1) {
     let best = null;
     let bestDistance = 421 * 421;
@@ -1488,6 +1571,72 @@ function refreshLocks() {
     lockTargets[filled] = best;
     filled += 1;
   }
+}
+
+function clearHostileShots() {
+  for (const shot of shots) {
+    if (shot.active && shot.team === 2) shot.active = false;
+  }
+}
+
+function useStoredItem() {
+  if (state.mode !== "running") return false;
+  const itemId = state.itemInventory.shift();
+  if (!itemId || !PICKUPS[itemId]) {
+    statusLive.textContent = STR.itemUnavailable;
+    syncActionButtons(true);
+    return false;
+  }
+
+  if (itemId === "shieldCell") {
+    player.shield = Math.min(3, player.shield + 1);
+    spawnEffect(player.x, player.y, 1.15, 0.62);
+  } else if (itemId === "repair") {
+    player.hp = Math.min(state.itemStats.maxHp, player.hp + Math.ceil(state.itemStats.maxHp * 0.3));
+    spawnEffect(player.x, player.y, 1.05, 0.58);
+  } else if (itemId === "empBurst") {
+    clearHostileShots();
+    for (const enemy of enemies) {
+      if (!enemy.active) continue;
+      enemy.hp -= 32;
+      enemy.hitFlash = 1;
+      if (enemy.hp <= 0) defeatEnemy(enemy);
+    }
+    spawnEffect(player.x, player.y, 2.3, 0.72);
+    state.shake = Math.max(state.shake, 7);
+  } else if (itemId === "missileCache") {
+    player.missileCharges = Math.min(3, player.missileCharges + 2);
+    player.missileRecharge = 0;
+  } else if (itemId === "lockBoost") {
+    state.lockBoostTime = Math.max(state.lockBoostTime, 8);
+    refreshLocks();
+  } else if (itemId === "overdriveCell") {
+    player.overdrive = Math.min(100, player.overdrive + 55);
+  } else if (itemId === "timeWarp") {
+    state.timeWarpTime = Math.max(state.timeWarpTime, 5);
+    spawnEffect(player.x, player.y, 1.65, 0.68);
+  } else if (itemId === "omegaBomb") {
+    clearHostileShots();
+    for (const enemy of enemies) {
+      if (!enemy.active) continue;
+      if (enemy.type === 3) {
+        enemy.hp = Math.max(1, enemy.hp - enemy.maxHp * 0.28);
+        enemy.hitFlash = 1;
+      } else {
+        enemy.hp = 0;
+        defeatEnemy(enemy);
+      }
+    }
+    spawnEffect(player.x, player.y, 3.2, 0.95);
+    state.flash = settings.reduceFlash ? 0.08 : 0.3;
+    state.shake = Math.max(state.shake, 12);
+  }
+
+  const copy = STR.pickups[itemId];
+  showActionFeedback(copy.name, STR.pickupUsedDetail, `pickup:${itemId}`);
+  audio.pickup();
+  syncActionButtons(true);
+  return true;
 }
 
 function launchMissiles() {
@@ -1685,8 +1834,10 @@ function updatePlayer() {
   }
   if (input.missileEdge || input.injectedMissile) launchMissiles();
   if (input.boostEdge || input.injectedBoost) activateOverdrive();
+  if (input.itemEdge || input.injectedItem) useStoredItem();
   input.injectedMissile = false;
   input.injectedBoost = false;
+  input.injectedItem = false;
 }
 
 function updateBoss(enemy) {
@@ -1821,11 +1972,12 @@ function updateShots() {
   for (let i = 0; i < shots.length; i += 1) {
     const shot = shots[i];
     if (!shot.active) continue;
+    const speedScale = shot.team === 2 && state.timeWarpTime > 0 ? 0.42 : 1;
     shot.px = shot.x;
     shot.py = shot.y;
-    shot.x += shot.vx * DT;
-    shot.y += shot.vy * DT;
-    shot.life -= DT;
+    shot.x += shot.vx * DT * speedScale;
+    shot.y += shot.vy * DT * speedScale;
+    shot.life -= DT * speedScale;
     if (shot.life <= 0 || shot.x < -80 || shot.x > WORLD_W + 80 || shot.y < -100 || shot.y > WORLD_H + 100) {
       shot.active = false;
       continue;
@@ -1915,12 +2067,16 @@ function updatePickups() {
     }
     pickup.x += pickup.vx * DT;
     pickup.y += pickup.vy * DT;
-    if (distance < 35) {
+    if (distance < 35 && state.itemInventory.length < MAX_INVENTORY) {
       pickup.active = false;
-      player.overdrive = Math.min(100, player.overdrive + 16);
-      if (player.missileCharges < 3 && rand() < 0.45) player.missileCharges += 1;
+      state.itemInventory.push(pickup.itemId);
       state.score += 250 * state.combo;
+      const copy = STR.pickups[pickup.itemId];
+      showActionFeedback(copy.name, STR.pickupStoredDetail, `pickup:${pickup.itemId}`);
       audio.pickup();
+      syncActionButtons(true);
+    } else if (distance < 35 && state.itemInventory.length >= MAX_INVENTORY) {
+      statusLive.textContent = STR.itemInventoryFull;
     } else if (pickup.life <= 0 || pickup.y > WORLD_H + 40) {
       pickup.active = false;
     }
@@ -1945,6 +2101,7 @@ function update() {
   if (state.mode !== "running") {
     input.missileEdge = false;
     input.boostEdge = false;
+    input.itemEdge = false;
     return;
   }
 
@@ -1962,6 +2119,7 @@ function update() {
       else showUpgradePanel();
       input.missileEdge = false;
       input.boostEdge = false;
+      input.itemEdge = false;
       return;
     }
   }
@@ -1970,6 +2128,8 @@ function update() {
   if (state.comboTimer <= 0) state.combo += (1 - state.combo) * 0.02;
   state.bannerTime = Math.max(0, state.bannerTime - DT);
   state.actionFeedbackTime = Math.max(0, state.actionFeedbackTime - DT);
+  state.lockBoostTime = Math.max(0, state.lockBoostTime - DT);
+  state.timeWarpTime = Math.max(0, state.timeWarpTime - DT);
   state.shake = Math.max(0, state.shake - DT * 18);
   state.flash = Math.max(0, state.flash - DT * 1.8);
   state.lockRefresh -= DT;
@@ -1992,6 +2152,7 @@ function update() {
   syncActionButtons();
   input.missileEdge = false;
   input.boostEdge = false;
+  input.itemEdge = false;
 }
 
 function drawImageCentered(image, x, y, targetHeight, rotation = 0, alpha = 1) {
@@ -2203,13 +2364,14 @@ function drawPickups() {
   for (let i = 0; i < pickups.length; i += 1) {
     const pickup = pickups[i];
     if (!pickup.active) continue;
+    const item = PICKUPS[pickup.itemId] || PICKUPS.missileCache;
     const radius = 10 + Math.sin(pickup.phase) * 2;
     ctx.save();
     ctx.translate(pickup.x, pickup.y);
     ctx.rotate(pickup.phase * 0.5);
-    ctx.fillStyle = "#ffd45b";
+    ctx.fillStyle = item.accent;
     ctx.shadowBlur = 18;
-    ctx.shadowColor = "#ffb42e";
+    ctx.shadowColor = item.accent;
     ctx.beginPath();
     for (let p = 0; p < 8; p += 1) {
       const a = p * Math.PI / 4;
@@ -2221,6 +2383,13 @@ function drawPickups() {
     }
     ctx.closePath();
     ctx.fill();
+    ctx.rotate(-pickup.phase * 0.5);
+    ctx.shadowBlur = 0;
+    ctx.fillStyle = "#020916";
+    ctx.font = "900 10px Bahnschrift, sans-serif";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText(item.icon, 0, 1);
     ctx.restore();
   }
 }
@@ -2363,6 +2532,21 @@ function drawFullHud(stage, shieldText) {
   ctx.fillText(STR[stage.nameKey], 690, 98);
 }
 
+function drawInventoryHud(compact, left) {
+  const y = compact ? 123 : 117;
+  ctx.textAlign = "left";
+  ctx.fillStyle = "rgba(244, 251, 255, .62)";
+  ctx.font = compact ? "800 10px Bahnschrift, sans-serif" : "800 12px Bahnschrift, sans-serif";
+  ctx.fillText(`${STR.itemInventory} ${state.itemInventory.length}/${MAX_INVENTORY}`, left, y);
+  for (let index = 0; index < MAX_INVENTORY; index += 1) {
+    const itemId = state.itemInventory[index];
+    const x = left + (compact ? 66 : 88) + index * (compact ? 26 : 34);
+    ctx.fillStyle = itemId ? PICKUPS[itemId].accent : "rgba(142, 245, 255, .22)";
+    ctx.font = compact ? "900 15px Bahnschrift, sans-serif" : "900 18px Bahnschrift, sans-serif";
+    ctx.fillText(itemId ? PICKUPS[itemId].icon : "·", x, y);
+  }
+}
+
 function drawBossHud(stage, compact, left, right) {
   if (state.boss?.active) {
     const boss = state.boss;
@@ -2411,7 +2595,12 @@ function drawActionFeedback(compact) {
   const fadeOut = Math.min(1, state.actionFeedbackTime / 0.3);
   const alpha = fadeIn * fadeOut;
   const overdrive = state.actionFeedbackKind === "overdrive";
-  const color = overdrive ? "#31eaff" : "#ff9a45";
+  const pickupId = state.actionFeedbackKind.startsWith("pickup:") ? state.actionFeedbackKind.slice(7) : "";
+  const color = overdrive
+    ? "#31eaff"
+    : pickupId && PICKUPS[pickupId]
+      ? PICKUPS[pickupId].accent
+      : "#ff9a45";
   const centerX = WORLD_W * 0.5;
   const centerY = WORLD_H * 0.47;
   const baseRadius = overdrive ? 86 : 66;
@@ -2461,13 +2650,14 @@ function drawHud() {
   const margin = compact ? 18 : 28;
   const left = visibleWorld.left + margin;
   const right = visibleWorld.right - margin;
-  const panelHeight = compact ? 132 : 108;
+  const panelHeight = compact ? 132 : 128;
   ctx.save();
   ctx.fillStyle = "rgba(2, 9, 22, .62)";
   ctx.fillRect(visibleWorld.left, 0, visibleWorld.width, panelHeight);
   const shieldText = player.shield > 0 ? ` · ${"⬡".repeat(player.shield)}` : "";
   if (compact) drawCompactHud(stage, left, right, shieldText);
   else drawFullHud(stage, shieldText);
+  drawInventoryHud(compact, left);
   drawBossHud(stage, compact, left, right);
   drawHudBanner(compact, left, right);
   drawHudIntro();
@@ -2572,8 +2762,10 @@ if (DEV) devPanel.style.display = "block";
 function debugSnapshot() {
   let activeEnemies = 0;
   let activeShots = 0;
+  let activePickups = 0;
   for (let i = 0; i < enemies.length; i += 1) if (enemies[i].active) activeEnemies += 1;
   for (let i = 0; i < shots.length; i += 1) if (shots[i].active) activeShots += 1;
+  for (let i = 0; i < pickups.length; i += 1) if (pickups[i].active) activePickups += 1;
   return {
     mode: state.mode,
     time: Number(state.time.toFixed(2)),
@@ -2583,6 +2775,10 @@ function debugSnapshot() {
     hull: Math.round(player.hp),
     overdrive: Math.round(player.overdrive),
     missiles: player.missileCharges,
+    inventory: [...state.itemInventory],
+    activePickups,
+    lockBoost: Number(state.lockBoostTime.toFixed(2)),
+    timeWarp: Number(state.timeWarpTime.toFixed(2)),
     playerX: Math.round(player.x),
     playerY: Math.round(player.y),
     bossActive: Boolean(state.boss?.active),
@@ -2614,6 +2810,7 @@ window.__BLACKWING__ = {
   start: resetGame,
   injectCommand(command) {
     if (command === "missile") input.injectedMissile = true;
+    if (command === "item") input.injectedItem = true;
     if (command === "boost") {
       player.overdrive = 100;
       input.injectedBoost = true;
@@ -2643,6 +2840,11 @@ window.__BLACKWING__ = {
   },
   setInvulnerable(seconds = 30) {
     player.invulnerable = Math.max(player.invulnerable, seconds);
+  },
+  spawnPickup(itemId = "") {
+    const pickup = spawnPickup(player.x, player.y);
+    if (pickup && PICKUPS[itemId]) pickup.itemId = itemId;
+    return debugSnapshot();
   },
   chooseUpgrade(itemId) {
     if (state.mode === "upgrade" && ITEMS[itemId]) equipUpgrade(itemId);

@@ -2,11 +2,13 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {
   MAX_ITEM_LEVEL,
+  PICKUPS,
   STAGES,
   applyItemLevel,
   createItemLevels,
   getBossTime,
   getItemStats,
+  getRandomPickupId,
   getStage,
   getUpgradeChoices,
 } from "../public/campaign.js";
@@ -38,4 +40,16 @@ test("item levels clamp and produce stronger stats", () => {
   for (let index = 0; index < 5; index += 1) levels = applyItemLevel(levels, "homing");
   assert.equal(levels.homing, MAX_ITEM_LEVEL);
   assert.ok(getItemStats(levels).missileDamage > getItemStats(createItemLevels()).missileDamage);
+});
+
+test("stage pickup pools use known item ids", () => {
+  for (const stage of STAGES) {
+    assert.ok(stage.pickupPool.length >= 3);
+    assert.ok(stage.pickupPool.every((id) => PICKUPS[id]));
+  }
+});
+
+test("random pickup selection follows the stage pool", () => {
+  assert.equal(getRandomPickupId(0, () => 0), "shieldCell");
+  assert.equal(getRandomPickupId(4, () => 0.99), "missileCache");
 });
