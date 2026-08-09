@@ -116,6 +116,17 @@
       backdrop-filter: blur(10px);
     }
     #briefingPanel[hidden] { display: none; }
+    #itemGuidePanel {
+      position: fixed;
+      inset: 0;
+      z-index: 21;
+      display: grid;
+      place-items: center;
+      padding: 24px;
+      background: rgba(1, 7, 17, .86);
+      backdrop-filter: blur(10px);
+    }
+    #itemGuidePanel[hidden] { display: none; }
     .briefing-shell {
       width: min(760px, 100%);
       max-height: calc(100dvh - 48px - var(--safe-bottom));
@@ -184,7 +195,9 @@
       letter-spacing: .06em;
     }
     #briefingItems,
-    #briefingPickups {
+    #briefingPickups,
+    #itemGuideCores,
+    #itemGuidePickups {
       display: grid;
       grid-template-columns: repeat(2, minmax(0, 1fr));
       gap: 8px;
@@ -777,7 +790,9 @@
       }
       .briefing-controls { grid-template-columns: 1fr; }
       #briefingItems,
-      #briefingPickups { gap: 7px; }
+      #briefingPickups,
+      #itemGuideCores,
+      #itemGuidePickups { gap: 7px; }
       .briefing-item { padding: 10px; }
       .briefing-actions .primary { width: 100%; }
     }
@@ -846,6 +861,7 @@
           <button id="startBtn" class="primary" type="button"></button>
           <button id="restartBtn" class="secondary" type="button" hidden></button>
           <button id="settingsBtn" class="secondary" type="button" aria-expanded="false"></button>
+          <button id="itemGuideBtn" class="secondary" type="button"></button>
         </div>
         <div id="settingsPanel" hidden>
           <label class="setting"><input id="shakeToggle" type="checkbox"><span id="shakeLabel"></span></label>
@@ -903,6 +919,24 @@
         <div id="briefingPickups"></div>
         <div class="briefing-actions">
           <button id="briefingLaunchBtn" class="primary" type="button"></button>
+        </div>
+      </div>
+    </section>
+    <section id="itemGuidePanel" aria-labelledby="itemGuideTitle" aria-modal="true" hidden>
+      <div class="briefing-shell" role="dialog">
+        <div class="briefing-header">
+          <div>
+            <p id="itemGuideEyebrow" class="eyebrow"></p>
+            <h2 id="itemGuideTitle" class="briefing-title"></h2>
+          </div>
+        </div>
+        <p id="itemGuideLead" class="briefing-lead"></p>
+        <h3 id="itemGuidePickupTitle" class="briefing-section-title"></h3>
+        <div id="itemGuidePickups"></div>
+        <h3 id="itemGuideCoreTitle" class="briefing-section-title"></h3>
+        <div id="itemGuideCores"></div>
+        <div class="briefing-actions">
+          <button id="itemGuideCloseBtn" class="secondary" type="button"></button>
         </div>
       </div>
     </section>

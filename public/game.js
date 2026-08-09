@@ -67,6 +67,7 @@ const resultKills = document.querySelector("#resultKills");
 const startBtn = document.querySelector("#startBtn");
 const restartBtn = document.querySelector("#restartBtn");
 const settingsBtn = document.querySelector("#settingsBtn");
+const itemGuideBtn = document.querySelector("#itemGuideBtn");
 const settingsPanel = document.querySelector("#settingsPanel");
 const shakeToggle = document.querySelector("#shakeToggle");
 const flashToggle = document.querySelector("#flashToggle");
@@ -112,6 +113,15 @@ const briefingItems = document.querySelector("#briefingItems");
 const briefingPickupsTitle = document.querySelector("#briefingPickupsTitle");
 const briefingPickups = document.querySelector("#briefingPickups");
 const briefingLaunchBtn = document.querySelector("#briefingLaunchBtn");
+const itemGuidePanel = document.querySelector("#itemGuidePanel");
+const itemGuideEyebrow = document.querySelector("#itemGuideEyebrow");
+const itemGuideTitle = document.querySelector("#itemGuideTitle");
+const itemGuideLead = document.querySelector("#itemGuideLead");
+const itemGuidePickupTitle = document.querySelector("#itemGuidePickupTitle");
+const itemGuidePickups = document.querySelector("#itemGuidePickups");
+const itemGuideCoreTitle = document.querySelector("#itemGuideCoreTitle");
+const itemGuideCores = document.querySelector("#itemGuideCores");
+const itemGuideCloseBtn = document.querySelector("#itemGuideCloseBtn");
 const testStageButtons = [];
 let testInvincible = TEST_MODE;
 let lastTestControlsKey = "";
@@ -150,6 +160,13 @@ briefingItemsTitle.textContent = STR.briefingItemsTitle;
 briefingPickupsTitle.textContent = STR.briefingPickupsTitle;
 briefingLaunchBtn.textContent = STR.briefingLaunch;
 briefingLaunchBtn.setAttribute("aria-label", STR.briefingLaunch);
+itemGuideEyebrow.textContent = STR.itemGuideEyebrow;
+itemGuideTitle.textContent = STR.itemGuideTitle;
+itemGuideLead.textContent = STR.itemGuideLead;
+itemGuidePickupTitle.textContent = STR.itemGuidePickupTitle;
+itemGuideCoreTitle.textContent = STR.itemGuideCoreTitle;
+itemGuideCloseBtn.textContent = STR.itemGuideClose;
+itemGuideCloseBtn.setAttribute("aria-label", STR.itemGuideClose);
 document.querySelector("#resultStats").setAttribute("aria-label", STR.resultScore);
 document.querySelector("#resultScoreLabel").textContent = STR.resultScore;
 document.querySelector("#resultBestLabel").textContent = STR.resultBest;
@@ -158,6 +175,8 @@ document.querySelector("#resultKillsLabel").textContent = STR.resultKills;
 moveStick.setAttribute("aria-label", STR.moveStick);
 settingsBtn.textContent = STR.settings;
 settingsBtn.setAttribute("aria-label", STR.accessibilityOpen);
+itemGuideBtn.textContent = STR.itemGuideButton;
+itemGuideBtn.setAttribute("aria-label", STR.itemGuideButton);
 restartBtn.textContent = STR.restart;
 upgradeEyebrow.textContent = STR.stageClear;
 upgradeTitle.textContent = STR.chooseUpgrade;
@@ -172,10 +191,10 @@ testNotice.textContent = STR.testOnly;
 testToggleBtn.setAttribute("aria-label", STR.testClose);
 testInvincibleToggle.checked = testInvincible;
 
-function renderBriefingItems() {
+function createItemCards(catalog, copyCatalog) {
   const fragment = document.createDocumentFragment();
-  for (const [itemId, item] of Object.entries(ITEMS)) {
-    const copy = STR.items[itemId];
+  for (const [itemId, item] of Object.entries(catalog)) {
+    const copy = copyCatalog[itemId];
     if (!copy) continue;
     const card = document.createElement("article");
     card.className = "briefing-item";
@@ -198,34 +217,14 @@ function renderBriefingItems() {
     card.append(heading, description);
     fragment.append(card);
   }
-  briefingItems.replaceChildren(fragment);
+  return fragment;
+}
 
-  const pickupFragment = document.createDocumentFragment();
-  for (const [pickupId, pickup] of Object.entries(PICKUPS)) {
-    const copy = STR.pickups[pickupId];
-    if (!copy) continue;
-    const card = document.createElement("article");
-    card.className = "briefing-item";
-    card.setAttribute("aria-label", `${copy.name}. ${copy.description}`);
-
-    const heading = document.createElement("div");
-    heading.className = "briefing-item-heading";
-    const icon = document.createElement("span");
-    icon.className = "briefing-item-icon";
-    icon.textContent = pickup.icon;
-    icon.setAttribute("aria-hidden", "true");
-    const name = document.createElement("strong");
-    name.className = "briefing-item-name";
-    name.textContent = copy.name;
-    heading.append(icon, name);
-
-    const description = document.createElement("span");
-    description.className = "briefing-item-description";
-    description.textContent = copy.description;
-    card.append(heading, description);
-    pickupFragment.append(card);
-  }
-  briefingPickups.replaceChildren(pickupFragment);
+function renderBriefingItems() {
+  briefingItems.replaceChildren(createItemCards(ITEMS, STR.items));
+  briefingPickups.replaceChildren(createItemCards(PICKUPS, STR.pickups));
+  itemGuideCores.replaceChildren(createItemCards(ITEMS, STR.items));
+  itemGuidePickups.replaceChildren(createItemCards(PICKUPS, STR.pickups));
 }
 
 function showBriefing() {
@@ -239,6 +238,16 @@ function showBriefing() {
 
 function hideBriefing() {
   briefingPanel.hidden = true;
+}
+
+function showItemGuide() {
+  itemGuidePanel.hidden = false;
+  itemGuideCloseBtn.focus({ preventScroll: true });
+}
+
+function hideItemGuide() {
+  itemGuidePanel.hidden = true;
+  itemGuideBtn.focus({ preventScroll: true });
 }
 
 function hasSeenBriefing() {
@@ -321,6 +330,8 @@ settingsBtn.addEventListener("click", () => {
   settingsBtn.setAttribute("aria-expanded", String(open));
   settingsBtn.setAttribute("aria-label", open ? STR.accessibilityClose : STR.accessibilityOpen);
 });
+itemGuideBtn.addEventListener("click", showItemGuide);
+itemGuideCloseBtn.addEventListener("click", hideItemGuide);
 
 let cssW = innerWidth;
 let cssH = innerHeight;
@@ -1528,9 +1539,15 @@ briefingLaunchBtn.addEventListener("click", async () => {
 });
 
 document.addEventListener("keydown", (event) => {
-  if (event.key !== "Escape" || briefingPanel.hidden) return;
-  hideBriefing();
-  startBtn.focus();
+  if (event.key !== "Escape") return;
+  if (!itemGuidePanel.hidden) {
+    hideItemGuide();
+    return;
+  }
+  if (!briefingPanel.hidden) {
+    hideBriefing();
+    startBtn.focus();
+  }
 });
 
 restartBtn.addEventListener("click", resetGame);
