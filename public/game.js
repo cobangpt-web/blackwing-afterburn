@@ -2525,24 +2525,52 @@ function drawFullHud(stage, shieldText) {
   ctx.fillText(STR[stage.nameKey], 690, 98);
 }
 
-function drawInventoryHud(compact, left) {
-  const y = compact ? 123 : 117;
+function drawInventoryHud(compact) {
+  const panelWidth = compact ? 260 : 320;
+  const panelHeight = compact ? 92 : 104;
+  const panelX = visibleWorld.left + Math.max(12, (visibleWorld.width - panelWidth) * 0.5);
+  const panelY = WORLD_H - panelHeight - (compact ? 24 : 30);
+  const slotGap = 8;
+  const slotWidth = (panelWidth - 24 - slotGap) * 0.5;
+  const slotY = panelY + 31;
+  const slotHeight = panelHeight - 42;
+
+  ctx.save();
+  ctx.fillStyle = "rgba(2, 9, 22, .82)";
+  ctx.fillRect(panelX, panelY, panelWidth, panelHeight);
+  ctx.strokeStyle = "rgba(49, 234, 255, .58)";
+  ctx.lineWidth = 2;
+  ctx.strokeRect(panelX, panelY, panelWidth, panelHeight);
   ctx.textAlign = "left";
-  ctx.fillStyle = "rgba(244, 251, 255, .62)";
-  ctx.font = compact ? "800 10px Bahnschrift, sans-serif" : "800 12px Bahnschrift, sans-serif";
-  ctx.fillText(`${STR.itemInventory} ${state.itemInventory.length}/${MAX_INVENTORY}`, left, y);
-  const slotStart = compact ? 94 : 116;
-  const slotGap = compact ? 28 : 38;
-  ctx.textAlign = "center";
+  ctx.fillStyle = "#8ef5ff";
+  ctx.font = compact ? "900 13px Bahnschrift, sans-serif" : "900 15px Bahnschrift, sans-serif";
+  ctx.fillText(`${STR.itemInventory} ${state.itemInventory.length}/${MAX_INVENTORY}`, panelX + 12, panelY + 20);
+  ctx.textAlign = "right";
+  ctx.fillStyle = "rgba(244, 251, 255, .68)";
+  ctx.font = compact ? "800 9px Bahnschrift, sans-serif" : "800 10px Bahnschrift, sans-serif";
+  ctx.fillText(STR.itemUseHint, panelX + panelWidth - 12, panelY + 20);
+
   for (let index = 0; index < MAX_INVENTORY; index += 1) {
     const itemId = state.itemInventory[index];
-    const x = left + slotStart + index * slotGap;
-    ctx.fillStyle = itemId ? PICKUPS[itemId].accent : "rgba(142, 245, 255, .22)";
-    ctx.font = compact ? "900 9px Bahnschrift, sans-serif" : "900 10px Bahnschrift, sans-serif";
-    ctx.fillText(String(index + 1), x, y - 13);
-    ctx.font = compact ? "900 15px Bahnschrift, sans-serif" : "900 18px Bahnschrift, sans-serif";
-    ctx.fillText(itemId ? PICKUPS[itemId].icon : "·", x, y);
+    const item = itemId ? PICKUPS[itemId] : null;
+    const copy = itemId ? STR.pickups[itemId] : null;
+    const slotX = panelX + 12 + index * (slotWidth + slotGap);
+    ctx.fillStyle = item ? "rgba(13, 43, 64, .9)" : "rgba(142, 245, 255, .08)";
+    ctx.fillRect(slotX, slotY, slotWidth, slotHeight);
+    ctx.strokeStyle = item ? item.accent : "rgba(142, 245, 255, .24)";
+    ctx.lineWidth = 1;
+    ctx.strokeRect(slotX, slotY, slotWidth, slotHeight);
+    ctx.textAlign = "center";
+    ctx.fillStyle = item ? item.accent : "rgba(142, 245, 255, .42)";
+    ctx.font = compact ? "900 10px Bahnschrift, sans-serif" : "900 11px Bahnschrift, sans-serif";
+    ctx.fillText(String(index + 1), slotX + 16, slotY + 18);
+    ctx.font = compact ? "900 17px Bahnschrift, sans-serif" : "900 20px Bahnschrift, sans-serif";
+    ctx.fillText(item?.icon || "·", slotX + 39, slotY + 19);
+    ctx.fillStyle = item ? "#f4fbff" : "rgba(244, 251, 255, .42)";
+    ctx.font = compact ? "800 9px Bahnschrift, sans-serif" : "800 10px Bahnschrift, sans-serif";
+    ctx.fillText(copy?.name || STR.itemEmpty, slotX + slotWidth * 0.5, slotY + slotHeight - 8);
   }
+  ctx.restore();
 }
 
 function drawBossHud(stage, compact, left, right) {
@@ -2655,11 +2683,11 @@ function drawHud() {
   const shieldText = player.shield > 0 ? ` · ${"⬡".repeat(player.shield)}` : "";
   if (compact) drawCompactHud(stage, left, right, shieldText);
   else drawFullHud(stage, shieldText);
-  drawInventoryHud(compact, left);
   drawBossHud(stage, compact, left, right);
   drawHudBanner(compact, left, right);
   drawHudIntro();
   drawActionFeedback(compact);
+  drawInventoryHud(compact);
   ctx.restore();
 }
 

@@ -35,8 +35,10 @@ const ko = {
   feedbackOverdrive: "오버드라이브 작동",
   feedbackOverdriveDetail: "BREAK / BURN",
   itemUnavailable: "사용할 아이템 없음",
-  itemInventory: "보급",
+  itemInventory: "아이템",
   itemInventoryFull: "보급 슬롯 가득 참",
+  itemUseHint: "1·2 사용",
+  itemEmpty: "빈 슬롯",
   pickupStoredDetail: "STORED // READY",
   pickupUsedDetail: "ITEM // DEPLOYED",
   pickups: {
@@ -169,8 +171,10 @@ const en = {
   feedbackOverdrive: "OVERDRIVE ACTIVE",
   feedbackOverdriveDetail: "BREAK / BURN",
   itemUnavailable: "No stored item",
-  itemInventory: "SUPPLY",
+  itemInventory: "ITEMS",
   itemInventoryFull: "Supply slots full",
+  itemUseHint: "USE 1·2",
+  itemEmpty: "EMPTY SLOT",
   pickupStoredDetail: "STORED // READY",
   pickupUsedDetail: "ITEM // DEPLOYED",
   pickups: {
