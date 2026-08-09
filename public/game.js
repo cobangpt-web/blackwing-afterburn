@@ -2535,14 +2535,14 @@ function drawFullHud(stage, shieldText) {
 }
 
 function drawInventoryHud(compact) {
-  const panelWidth = compact ? 260 : 320;
-  const panelHeight = compact ? 92 : 104;
-  const panelX = visibleWorld.left + Math.max(12, (visibleWorld.width - panelWidth) * 0.5);
+  const panelWidth = visibleWorld.width - (compact ? 36 : 56);
+  const panelHeight = compact ? 126 : 138;
+  const panelX = visibleWorld.left + (visibleWorld.width - panelWidth) * 0.5;
   const panelY = WORLD_H - panelHeight - (compact ? 24 : 30);
-  const slotGap = 8;
+  const slotGap = 12;
   const slotWidth = (panelWidth - 24 - slotGap) * 0.5;
-  const slotY = panelY + 31;
-  const slotHeight = panelHeight - 42;
+  const slotY = panelY + 36;
+  const slotHeight = panelHeight - 48;
 
   ctx.save();
   ctx.fillStyle = "rgba(2, 9, 22, .82)";
@@ -2552,11 +2552,11 @@ function drawInventoryHud(compact) {
   ctx.strokeRect(panelX, panelY, panelWidth, panelHeight);
   ctx.textAlign = "left";
   ctx.fillStyle = "#8ef5ff";
-  ctx.font = compact ? "900 13px Bahnschrift, sans-serif" : "900 15px Bahnschrift, sans-serif";
+  ctx.font = compact ? "900 17px Bahnschrift, sans-serif" : "900 19px Bahnschrift, sans-serif";
   ctx.fillText(`${STR.itemInventory} ${state.itemInventory.length}/${MAX_INVENTORY}`, panelX + 12, panelY + 20);
   ctx.textAlign = "right";
   ctx.fillStyle = "rgba(244, 251, 255, .68)";
-  ctx.font = compact ? "800 9px Bahnschrift, sans-serif" : "800 10px Bahnschrift, sans-serif";
+  ctx.font = compact ? "800 13px Bahnschrift, sans-serif" : "800 14px Bahnschrift, sans-serif";
   ctx.fillText(STR.itemUseHint, panelX + panelWidth - 12, panelY + 20);
 
   for (let index = 0; index < MAX_INVENTORY; index += 1) {
@@ -2569,15 +2569,21 @@ function drawInventoryHud(compact) {
     ctx.strokeStyle = item ? item.accent : "rgba(142, 245, 255, .24)";
     ctx.lineWidth = 1;
     ctx.strokeRect(slotX, slotY, slotWidth, slotHeight);
-    ctx.textAlign = "center";
+    ctx.textAlign = "left";
     ctx.fillStyle = item ? item.accent : "rgba(142, 245, 255, .42)";
-    ctx.font = compact ? "900 10px Bahnschrift, sans-serif" : "900 11px Bahnschrift, sans-serif";
-    ctx.fillText(String(index + 1), slotX + 16, slotY + 18);
-    ctx.font = compact ? "900 17px Bahnschrift, sans-serif" : "900 20px Bahnschrift, sans-serif";
-    ctx.fillText(item?.icon || "·", slotX + 39, slotY + 19);
+    ctx.font = compact ? "900 13px Bahnschrift, sans-serif" : "900 14px Bahnschrift, sans-serif";
+    ctx.fillText(String(index + 1), slotX + 16, slotY + 23);
+    ctx.font = compact ? "900 26px Bahnschrift, sans-serif" : "900 29px Bahnschrift, sans-serif";
+    ctx.fillText(item?.icon || "·", slotX + 43, slotY + 25);
     ctx.fillStyle = item ? "#f4fbff" : "rgba(244, 251, 255, .42)";
-    ctx.font = compact ? "800 9px Bahnschrift, sans-serif" : "800 10px Bahnschrift, sans-serif";
-    ctx.fillText(copy?.name || STR.itemEmpty, slotX + slotWidth * 0.5, slotY + slotHeight - 8);
+    ctx.font = compact ? "900 15px Bahnschrift, sans-serif" : "900 17px Bahnschrift, sans-serif";
+    ctx.fillText(copy?.name || STR.itemEmpty, slotX + 82, slotY + 23);
+    if (copy) {
+      ctx.textAlign = "left";
+      ctx.fillStyle = "rgba(244, 251, 255, .72)";
+      ctx.font = compact ? "800 13px Bahnschrift, sans-serif" : "800 14px Bahnschrift, sans-serif";
+      ctx.fillText(copy.description, slotX + 16, slotY + slotHeight - 13);
+    }
   }
   ctx.restore();
 }
