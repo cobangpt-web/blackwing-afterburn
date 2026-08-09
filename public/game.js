@@ -876,6 +876,10 @@ const state = {
   boss: null,
   banner: "",
   bannerTime: 0,
+  actionFeedback: "",
+  actionFeedbackDetail: "",
+  actionFeedbackKind: "",
+  actionFeedbackTime: 0,
   shake: 0,
   flash: 0,
   lockRefresh: 0,
@@ -1064,6 +1068,14 @@ function setBanner(text) {
   state.banner = text;
   state.bannerTime = 2.2;
   statusLive.textContent = text;
+}
+
+function showActionFeedback(label, detail, kind) {
+  state.actionFeedback = label;
+  state.actionFeedbackDetail = detail;
+  state.actionFeedbackKind = kind;
+  state.actionFeedbackTime = 1.1;
+  statusLive.textContent = `${label} · ${detail}`;
 }
 
 function spawnWave() {
@@ -1316,6 +1328,10 @@ function resetGame() {
   state.comboTimer = 0;
   state.banner = "";
   state.bannerTime = 0;
+  state.actionFeedback = "";
+  state.actionFeedbackDetail = "";
+  state.actionFeedbackKind = "";
+  state.actionFeedbackTime = 0;
   state.shake = 0;
   state.flash = 0;
   state.lockRefresh = 0;
@@ -1500,6 +1516,7 @@ function launchMissiles() {
   }
   audio.missile();
   state.shake = Math.max(state.shake, 3);
+  showActionFeedback(STR.feedbackMissile, STR.feedbackMissileDetail, "missile");
   syncActionButtons();
   return true;
 }
@@ -1531,6 +1548,7 @@ function activateOverdrive() {
   audio.boost();
   state.shake = Math.max(state.shake, 7);
   state.flash = settings.reduceFlash ? 0.05 : 0.24;
+  showActionFeedback(STR.feedbackOverdrive, STR.feedbackOverdriveDetail, "overdrive");
   syncActionButtons();
   return true;
 }
@@ -1933,6 +1951,7 @@ function update() {
   state.comboTimer = Math.max(0, state.comboTimer - DT);
   if (state.comboTimer <= 0) state.combo += (1 - state.combo) * 0.02;
   state.bannerTime = Math.max(0, state.bannerTime - DT);
+  state.actionFeedbackTime = Math.max(0, state.actionFeedbackTime - DT);
   state.shake = Math.max(0, state.shake - DT * 18);
   state.flash = Math.max(0, state.flash - DT * 1.8);
   state.lockRefresh -= DT;
@@ -2366,6 +2385,58 @@ function drawHudIntro() {
   }
 }
 
+function drawActionFeedback(compact) {
+  if (state.actionFeedbackTime <= 0) return;
+  const duration = 1.1;
+  const elapsed = duration - state.actionFeedbackTime;
+  const fadeIn = Math.min(1, elapsed / 0.12);
+  const fadeOut = Math.min(1, state.actionFeedbackTime / 0.3);
+  const alpha = fadeIn * fadeOut;
+  const overdrive = state.actionFeedbackKind === "overdrive";
+  const color = overdrive ? "#31eaff" : "#ff9a45";
+  const centerX = WORLD_W * 0.5;
+  const centerY = WORLD_H * 0.47;
+  const baseRadius = overdrive ? 86 : 66;
+  const radius = baseRadius + Math.min(1, elapsed / 0.34) * (overdrive ? 22 : 16);
+  const pulse = 1 + Math.sin(elapsed * 24) * 0.045;
+  const arm = (compact ? 74 : 112) + Math.min(1, elapsed / 0.3) * 26;
+
+  ctx.save();
+  ctx.translate(centerX, centerY);
+  ctx.globalAlpha = alpha;
+  ctx.strokeStyle = color;
+  ctx.shadowBlur = 24;
+  ctx.shadowColor = color;
+  ctx.lineWidth = compact ? 2 : 3;
+  ctx.beginPath();
+  ctx.arc(0, 0, radius * pulse, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.shadowBlur = 0;
+
+  ctx.globalAlpha = alpha * 0.78;
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(-arm, -11);
+  ctx.lineTo(-arm + 36, -11);
+  ctx.moveTo(arm, -11);
+  ctx.lineTo(arm - 36, -11);
+  ctx.moveTo(-arm, 11);
+  ctx.lineTo(-arm + 36, 11);
+  ctx.moveTo(arm, 11);
+  ctx.lineTo(arm - 36, 11);
+  ctx.stroke();
+
+  ctx.globalAlpha = alpha;
+  ctx.textAlign = "center";
+  ctx.fillStyle = "#f4fbff";
+  ctx.font = compact ? "900 23px Bahnschrift, sans-serif" : "900 34px Bahnschrift, sans-serif";
+  ctx.fillText(state.actionFeedback, 0, 8);
+  ctx.fillStyle = color;
+  ctx.font = compact ? "800 10px Bahnschrift, sans-serif" : "800 14px Bahnschrift, sans-serif";
+  ctx.fillText(state.actionFeedbackDetail, 0, 34);
+  ctx.restore();
+}
+
 function drawHud() {
   const stage = getStage(state.stageIndex);
   const compact = visibleWorld.width < 690;
@@ -2382,6 +2453,7 @@ function drawHud() {
   drawBossHud(stage, compact, left, right);
   drawHudBanner(compact, left, right);
   drawHudIntro();
+  drawActionFeedback(compact);
   ctx.restore();
 }
 
