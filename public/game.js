@@ -53,6 +53,13 @@ const ctx = canvas.getContext("2d", { alpha: false, desynchronized: true });
 const overlay = document.querySelector("#overlay");
 const overlayMessage = document.querySelector("#overlayMessage");
 const scoreSummary = document.querySelector("#scoreSummary");
+const gameTitle = document.querySelector("#gameTitle");
+const tagline = document.querySelector("#tagline");
+const resultStats = document.querySelector("#resultStats");
+const resultScore = document.querySelector("#resultScore");
+const resultBest = document.querySelector("#resultBest");
+const resultStage = document.querySelector("#resultStage");
+const resultKills = document.querySelector("#resultKills");
 const startBtn = document.querySelector("#startBtn");
 const restartBtn = document.querySelector("#restartBtn");
 const settingsBtn = document.querySelector("#settingsBtn");
@@ -88,8 +95,8 @@ document.documentElement.lang = (navigator.language || "en").toLowerCase().start
 document.title = STR.title;
 canvas.setAttribute("aria-label", `${STR.title}. ${STR.objective}`);
 document.querySelector("#eyebrow").textContent = STR.sortie;
-document.querySelector("#gameTitle").textContent = STR.title;
-document.querySelector("#tagline").textContent = STR.tagline;
+gameTitle.textContent = STR.title;
+tagline.textContent = STR.tagline;
 document.querySelector("#shakeLabel").textContent = STR.reduceShake;
 document.querySelector("#flashLabel").textContent = STR.reduceFlash;
 document.querySelector("#muteLabel").textContent = STR.mute;
@@ -100,6 +107,11 @@ boostBtn.setAttribute("aria-label", STR.boostButton);
 pauseBtn.setAttribute("aria-label", STR.pauseButton);
 document.querySelector("#controlsHelp").textContent =
   `${STR.controlsKeyboard} · ${STR.controlsTouch} · ${STR.controlsPad}`;
+document.querySelector("#resultStats").setAttribute("aria-label", STR.resultScore);
+document.querySelector("#resultScoreLabel").textContent = STR.resultScore;
+document.querySelector("#resultBestLabel").textContent = STR.resultBest;
+document.querySelector("#resultStageLabel").textContent = STR.resultStage;
+document.querySelector("#resultKillsLabel").textContent = STR.resultKills;
 moveStick.setAttribute("aria-label", STR.moveStick);
 settingsBtn.textContent = STR.settings;
 settingsBtn.setAttribute("aria-label", STR.accessibilityOpen);
@@ -311,6 +323,7 @@ class AudioEngine {
     this.ctx = null;
     this.master = null;
     this.music = null;
+    this.musicFilter = null;
     this.sfx = null;
     this.cannonBuffer = null;
     this.boostBuffer = null;
@@ -330,11 +343,15 @@ class AudioEngine {
     this.ctx = new AudioContextClass();
     this.master = this.ctx.createGain();
     this.music = this.ctx.createGain();
+    this.musicFilter = this.ctx.createBiquadFilter();
     this.sfx = this.ctx.createGain();
     this.master.gain.value = settings.muted ? 0 : 0.72;
     this.music.gain.value = 0.12;
+    this.musicFilter.type = "lowpass";
+    this.musicFilter.frequency.value = 2200;
+    this.musicFilter.Q.value = 0.45;
     this.sfx.gain.value = 0.34;
-    this.music.connect(this.master);
+    this.music.connect(this.musicFilter).connect(this.master);
     this.sfx.connect(this.master);
     this.master.connect(this.ctx.destination);
     this.noiseBuffer = this.makeNoise();
@@ -376,12 +393,15 @@ class AudioEngine {
     const bassGain = this.ctx.createGain();
     const leadGain = this.ctx.createGain();
     const airGain = this.ctx.createGain();
-    bass.type = "sawtooth";
-    lead.type = "square";
-    air.type = "triangle";
-    bassGain.gain.value = 0.18;
-    leadGain.gain.value = 0.025;
-    airGain.gain.value = 0.035;
+    bass.type = "triangle";
+    lead.type = "sine";
+    air.type = "sine";
+    bass.detune.value = -5;
+    lead.detune.value = 4;
+    air.detune.value = -7;
+    bassGain.gain.value = 0.13;
+    leadGain.gain.value = 0.018;
+    airGain.gain.value = 0.016;
     bass.connect(bassGain).connect(this.music);
     lead.connect(leadGain).connect(this.music);
     air.connect(airGain).connect(this.music);
@@ -393,18 +413,34 @@ class AudioEngine {
 
   tick(gameTime, bossActive) {
     if (!this.ctx || !this.musicNodes) return;
-    const beat = Math.floor(gameTime * 5);
+    const beat = Math.floor(gameTime * 4);
     if (beat === this.lastBeat) return;
     this.lastBeat = beat;
-    const roots = bossActive ? [43.65, 51.91, 58.27, 65.41] : [55, 65.41, 73.42, 82.41];
+    const roots = bossActive ? [41.2, 46.25, 49, 55] : [55, 61.74, 65.41, 73.42];
     const root = roots[(beat >> 2) % roots.length];
-    const pattern = [1, 1, 1.5, 1, 2, 1.5, 1.25, 1];
+    const bassPattern = [1, 1, 1.189, 1, 1.335, 1.189, 1, 0.891];
+    const leadPattern = [1.498, 1.335, 1.189, 1, 1.189, 1.335, 1.681, 1.498];
     const now = this.ctx.currentTime;
-    this.musicNodes.bass.frequency.setTargetAtTime(root * pattern[beat % pattern.length], now, 0.018);
-    this.musicNodes.lead.frequency.setTargetAtTime(root * 4 * pattern[(beat + 3) % pattern.length], now, 0.012);
-    this.musicNodes.air.frequency.setTargetAtTime(root * 2, now, 0.08);
-    this.musicNodes.bassGain.gain.setValueAtTime(beat % 2 ? 0.1 : 0.22, now);
-    this.musicNodes.leadGain.gain.setValueAtTime(beat % 4 === 2 ? 0.05 : 0.018, now);
+    this.musicNodes.bass.frequency.setTargetAtTime(root * bassPattern[beat % bassPattern.length], now, 0.055);
+    this.musicNodes.lead.frequency.setTargetAtTime(root * 4 * leadPattern[(beat + 2) % leadPattern.length], now, 0.04);
+    this.musicNodes.air.frequency.setTargetAtTime(root * 2, now, 0.12);
+    this.musicNodes.bassGain.gain.setValueAtTime(beat % 4 === 0 ? 0.15 : 0.095, now);
+    this.musicNodes.leadGain.gain.setValueAtTime(beat % 4 === 2 ? 0.04 : 0.012, now);
+    this.musicNodes.airGain.gain.setValueAtTime(bossActive ? 0.022 : 0.012, now);
+  }
+
+  setMusicMode(mode = "running") {
+    if (!this.ctx || !this.music || !this.musicFilter) return;
+    const now = this.ctx.currentTime;
+    const values = {
+      running: { gain: 0.12, filter: 2200 },
+      paused: { gain: 0.045, filter: 920 },
+      defeat: { gain: 0.028, filter: 560 },
+      victory: { gain: 0.07, filter: 1500 },
+    };
+    const target = values[mode] || values.running;
+    this.music.gain.setTargetAtTime(target.gain, now, 0.2);
+    this.musicFilter.frequency.setTargetAtTime(target.filter, now, 0.24);
   }
 
   setMuted(muted) {
@@ -434,7 +470,35 @@ class AudioEngine {
   }
 
   missile() {
-    this.sweep(180, 680, 0.32, "sawtooth", 0.18);
+    if (!this.ctx || !this.noiseBuffer || settings.muted) return;
+    const now = this.ctx.currentTime;
+    const whoosh = this.ctx.createBufferSource();
+    const filter = this.ctx.createBiquadFilter();
+    const whooshGain = this.ctx.createGain();
+    whoosh.buffer = this.noiseBuffer;
+    whoosh.playbackRate.value = 1.35;
+    filter.type = "bandpass";
+    filter.Q.value = 0.75;
+    filter.frequency.setValueAtTime(1500, now);
+    filter.frequency.exponentialRampToValueAtTime(220, now + 0.34);
+    whooshGain.gain.setValueAtTime(0.0001, now);
+    whooshGain.gain.linearRampToValueAtTime(0.12, now + 0.018);
+    whooshGain.gain.exponentialRampToValueAtTime(0.001, now + 0.36);
+    whoosh.connect(filter).connect(whooshGain).connect(this.sfx);
+    whoosh.start(now);
+    whoosh.stop(now + 0.38);
+
+    const lockTone = this.ctx.createOscillator();
+    const lockGain = this.ctx.createGain();
+    lockTone.type = "triangle";
+    lockTone.frequency.setValueAtTime(330, now);
+    lockTone.frequency.exponentialRampToValueAtTime(150, now + 0.26);
+    lockGain.gain.setValueAtTime(0.0001, now);
+    lockGain.gain.linearRampToValueAtTime(0.12, now + 0.012);
+    lockGain.gain.exponentialRampToValueAtTime(0.001, now + 0.29);
+    lockTone.connect(lockGain).connect(this.sfx);
+    lockTone.start(now);
+    lockTone.stop(now + 0.31);
   }
 
   boost() {
@@ -1216,6 +1280,10 @@ function showUpgradePanel() {
 
 function resetGame() {
   releaseTransientInput();
+  overlay.classList.remove("result-screen", "result-defeat", "result-victory", "is-visible");
+  resultStats.hidden = true;
+  gameTitle.textContent = STR.title;
+  tagline.textContent = STR.tagline;
   state.itemLevels = createItemLevels();
   state.itemStats = getItemStats(state.itemLevels);
   state.seed = 0x13a7c0de;
@@ -1239,6 +1307,7 @@ function resetGame() {
   settingsBtn.setAttribute("aria-expanded", "false");
   settingsBtn.setAttribute("aria-label", STR.accessibilityOpen);
   scoreSummary.textContent = "";
+  audio.setMusicMode("running");
 }
 
 function endGame(victory) {
@@ -1258,12 +1327,23 @@ function endGame(victory) {
   hudButtons.hidden = true;
   restartBtn.hidden = true;
   document.querySelector("#eyebrow").textContent = victory ? STR.victory : STR.defeat;
+  gameTitle.textContent = victory ? STR.victoryTitle : STR.gameOverTitle;
+  tagline.textContent = victory ? STR.victoryTagline : STR.gameOverTagline;
   overlayMessage.textContent = victory ? STR.victorySummary : STR.defeatSummary;
   statusLive.textContent = victory ? STR.victorySummary : STR.defeatSummary;
   const record = !TEST_MODE && state.best > oldBest ? ` · ${STR.newBest}` : "";
   const testSuffix = TEST_MODE ? ` · ${STR.testOnly}` : "";
   scoreSummary.textContent = `${STR.finalScore}: ${Math.round(state.score).toLocaleString()} · ${STR.bestScore}: ${Math.round(state.best).toLocaleString()}${record}${testSuffix}`;
+  resultScore.textContent = Math.round(state.score).toLocaleString();
+  resultBest.textContent = Math.round(state.best).toLocaleString();
+  resultStage.textContent = `${state.stageIndex + 1} / ${STAGES.length}`;
+  resultKills.textContent = Math.round(state.kills).toLocaleString();
+  resultStats.hidden = false;
+  overlay.classList.remove("is-visible", "result-defeat", "result-victory");
+  overlay.classList.add("result-screen", victory ? "result-victory" : "result-defeat");
+  requestAnimationFrame(() => overlay.classList.add("is-visible"));
   startBtn.textContent = STR.restart;
+  audio.setMusicMode(victory ? "victory" : "defeat");
   syncActionButtons(true);
   syncTestControls(true);
   startBtn.focus();
@@ -1279,6 +1359,7 @@ function togglePause() {
     overlayMessage.textContent = STR.objective;
     scoreSummary.textContent = "";
     startBtn.textContent = STR.resume;
+    audio.setMusicMode("paused");
     syncActionButtons(true);
     startBtn.focus();
   } else if (state.mode === "paused") {
@@ -1286,6 +1367,7 @@ function togglePause() {
     overlay.hidden = true;
     hudButtons.hidden = false;
     restartBtn.hidden = true;
+    audio.setMusicMode("running");
     syncActionButtons(true);
     canvas.focus();
   }

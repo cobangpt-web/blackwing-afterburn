@@ -216,6 +216,53 @@
       font-size: 18px;
       letter-spacing: .04em;
     }
+    #resultStats {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 8px;
+      margin: 18px 0;
+    }
+    #resultStats[hidden] { display: none; }
+    .result-stat {
+      min-width: 0;
+      padding: 11px 12px;
+      border: 1px solid rgba(142, 245, 255, .22);
+      background: linear-gradient(145deg, rgba(13, 43, 64, .76), rgba(2, 12, 25, .7));
+    }
+    .result-stat span,
+    .result-stat strong { display: block; }
+    .result-stat span {
+      color: rgba(244, 251, 255, .58);
+      font-size: 11px;
+      letter-spacing: .1em;
+      text-transform: uppercase;
+    }
+    .result-stat strong {
+      margin-top: 5px;
+      color: var(--white);
+      font-size: clamp(17px, 2vw, 23px);
+      letter-spacing: .02em;
+    }
+    #overlay.result-screen {
+      opacity: 0;
+      background:
+        radial-gradient(circle at 78% 24%, rgba(255, 92, 35, .16), transparent 30%),
+        linear-gradient(90deg, rgba(1, 8, 18, .98) 0%, rgba(1, 8, 18, .82) 48%, rgba(1, 8, 18, .36) 78%),
+        url("./assets/cover_art.png") center / cover no-repeat;
+    }
+    #overlay.result-screen.is-visible { opacity: 1; }
+    #overlay.result-screen .panel {
+      opacity: 0;
+      transform: translateY(18px) scale(.985);
+      transition: opacity .42s ease .08s, transform .42s cubic-bezier(.22, .8, .28, 1) .08s;
+    }
+    #overlay.result-screen.is-visible .panel {
+      opacity: 1;
+      transform: none;
+    }
+    #overlay.result-defeat .panel { border-left-color: var(--orange-400); }
+    #overlay.result-defeat .eyebrow { color: var(--orange-400); }
+    #overlay.result-victory .panel { border-left-color: var(--cyan-300); }
     .actions { display: flex; flex-wrap: wrap; gap: 10px; }
     .primary {
       min-width: 190px;
@@ -552,6 +599,9 @@
         min-height: 22px;
         font-size: 16px;
       }
+      #resultStats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .result-stat { padding: 9px 10px; }
+      .result-stat span { font-size: 10px; }
       #missileBtn {
         right: max(14px, var(--safe-right));
         bottom: calc(104px + var(--safe-bottom));
@@ -639,6 +689,12 @@
         <p id="tagline" class="subhead"></p>
         <p id="overlayMessage"></p>
         <p id="scoreSummary" aria-live="polite"></p>
+        <div id="resultStats" aria-label="Run summary" hidden>
+          <div class="result-stat"><span id="resultScoreLabel"></span><strong id="resultScore"></strong></div>
+          <div class="result-stat"><span id="resultBestLabel"></span><strong id="resultBest"></strong></div>
+          <div class="result-stat"><span id="resultStageLabel"></span><strong id="resultStage"></strong></div>
+          <div class="result-stat"><span id="resultKillsLabel"></span><strong id="resultKills"></strong></div>
+        </div>
         <div class="actions">
           <button id="startBtn" class="primary" type="button"></button>
           <button id="restartBtn" class="secondary" type="button" hidden></button>
