@@ -16,14 +16,7 @@ export function applyBossDamage(currentHp, maxHp, amount) {
   };
 }
 
-export function getBossHpRatio(hp, maxHp) {
-  if (!Number.isFinite(maxHp) || maxHp <= 0) return 0;
-  return clampBossHp(hp, maxHp) / maxHp;
-}
-
-export function shouldKeepBossHitFeedback(currentSource, remainingTime, nextSource) {
-  return nextSource !== "missile"
-    && currentSource === "missile"
-    && Number.isFinite(remainingTime)
-    && remainingTime > 0.18;
+export function getHitFlashDuration(enemyType, source) {
+  if (enemyType === 3) return source === "missile" ? 1.8 : 0;
+  return 1;
 }

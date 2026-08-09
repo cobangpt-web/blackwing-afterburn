@@ -17,11 +17,7 @@ import {
   HOMING_MISSILE_SPEED,
   steerMissile,
 } from "./missiles.js";
-import {
-  applyBossDamage,
-  getBossHpRatio,
-  shouldKeepBossHitFeedback,
-} from "./boss-feedback.js";
+import { applyBossDamage, getHitFlashDuration } from "./boss-feedback.js";
 import { drawLowerFieldShade, drawUpperFieldTint } from "./rendering.js";
 import { createViewportLayout, getTouchLeadWorld } from "./viewport.js";
 
@@ -904,7 +900,7 @@ function pollGamepad() {
 function makeEnemy() {
   return {
     active: false, type: 0, x: 0, y: 0, vx: 0, vy: 0, hp: 0, maxHp: 0,
-    age: 0, phase: 0, shoot: 0, altShoot: 0, summon: 0, radius: 28, score: 0, hitFlash: 0, hpTrail: 0,
+    age: 0, phase: 0, shoot: 0, altShoot: 0, summon: 0, radius: 28, score: 0, hitFlash: 0,
   };
 }
 function makeShot() {
@@ -960,11 +956,6 @@ const state = {
   wave: 0,
   bossSpawned: false,
   boss: null,
-  bossHitTime: 0,
-  bossHitAmount: 0,
-  bossHitSource: "",
-  bossHitX: WORLD_W * 0.5,
-  bossHitY: 180,
   banner: "",
   bannerTime: 0,
   actionFeedback: "",
@@ -1072,7 +1063,6 @@ function spawnEnemy(type, x, y, phase = 0) {
       enemy.score = Math.round(12000 * stage.difficulty);
       state.boss = enemy;
     }
-    enemy.hpTrail = enemy.hp;
     return enemy;
   }
   return null;
@@ -1429,11 +1419,6 @@ function resetGame() {
   state.comboTimer = 0;
   state.banner = "";
   state.bannerTime = 0;
-  state.bossHitTime = 0;
-  state.bossHitAmount = 0;
-  state.bossHitSource = "";
-  state.bossHitX = WORLD_W * 0.5;
-  state.bossHitY = 180;
   state.actionFeedback = "";
   state.actionFeedbackDetail = "";
   state.actionFeedbackKind = "";
@@ -1597,20 +1582,10 @@ function damageEnemy(enemy, amount, source = "cannon", x = enemy?.x, y = enemy?.
   if (!enemy?.active) return { before: 0, after: 0, damage: 0, defeated: false };
   const result = applyBossDamage(enemy.hp, enemy.maxHp, amount);
   enemy.hp = result.after;
-  if (result.damage > 0) enemy.hitFlash = 1;
+  if (result.damage > 0) {
+    enemy.hitFlash = Math.max(enemy.hitFlash, getHitFlashDuration(enemy.type, source));
+  }
   if (enemy.type === 3 && result.damage > 0) {
-    const keepMissileFeedback = shouldKeepBossHitFeedback(
-      state.bossHitSource,
-      state.bossHitTime,
-      source,
-    );
-    if (!keepMissileFeedback) {
-      state.bossHitTime = 0.78;
-      state.bossHitAmount = result.damage;
-      state.bossHitSource = source;
-      state.bossHitX = Number.isFinite(x) ? x : enemy.x;
-      state.bossHitY = Number.isFinite(y) ? y : enemy.y;
-    }
     state.shake = Math.max(state.shake, source === "missile" ? 6 : 3);
   }
   if (finish && result.defeated) defeatEnemy(enemy);
@@ -1958,9 +1933,6 @@ function updateEnemies() {
     if (!enemy.active) continue;
     enemy.age += DT;
     enemy.hitFlash = Math.max(0, enemy.hitFlash - DT * 6);
-    if (enemy.type === 3) {
-      enemy.hpTrail += (enemy.hp - enemy.hpTrail) * Math.min(1, DT * 5);
-    }
     enemy.shoot -= DT;
     enemy.altShoot -= DT;
     enemy.summon -= DT;
@@ -2166,7 +2138,6 @@ function update() {
   if (state.comboTimer <= 0) state.combo += (1 - state.combo) * 0.02;
   state.bannerTime = Math.max(0, state.bannerTime - DT);
   state.actionFeedbackTime = Math.max(0, state.actionFeedbackTime - DT);
-  state.bossHitTime = Math.max(0, state.bossHitTime - DT);
   state.lockBoostTime = Math.max(0, state.lockBoostTime - DT);
   state.timeWarpTime = Math.max(0, state.timeWarpTime - DT);
   state.shake = Math.max(0, state.shake - DT * 18);
@@ -2298,8 +2269,24 @@ function drawEnemies() {
     ctx.save();
     ctx.shadowBlur = enemy.type === 3 ? 28 : 12;
     ctx.shadowColor = enemy.type === 0 ? "rgba(255,74,42,.9)" : "rgba(255,112,38,.72)";
-    if (enemy.hitFlash > 0.5) ctx.globalAlpha = 0.62 + Math.sin(enemy.hitFlash * 30) * 0.22;
+    const flashPulse = enemy.hitFlash > 0 ? Math.abs(Math.sin(enemy.hitFlash * 28)) : 0;
+    if (enemy.hitFlash > 0.5) {
+      ctx.globalAlpha = enemy.type === 3
+        ? 0.68 + flashPulse * 0.32
+        : 0.62 + flashPulse * 0.22;
+      if (enemy.type === 3) {
+        ctx.filter = `brightness(${1.35 + flashPulse * 1.9}) saturate(${1 - flashPulse * 0.58})`;
+        ctx.shadowBlur = 36 + flashPulse * 18;
+        ctx.shadowColor = "rgba(255,244,212,.98)";
+      }
+    }
     drawImageCentered(image, enemy.x, enemy.y, height, Math.PI);
+    if (enemy.type === 3 && enemy.hitFlash > 0.2) {
+      ctx.globalCompositeOperation = "lighter";
+      ctx.globalAlpha = 0.12 + flashPulse * 0.3;
+      ctx.filter = "brightness(2.8) saturate(0)";
+      drawImageCentered(image, enemy.x, enemy.y, height, Math.PI);
+    }
     ctx.restore();
     if (enemy.type === 3 && enemy.y > 0) {
       const open = Math.sin(enemy.age * 2.4) > -0.25;
@@ -2626,78 +2613,13 @@ function drawInventoryHud(compact) {
 }
 
 function drawBossHud(stage, compact, left, right) {
-  const boss = state.boss;
-  if (!boss?.active) return;
-  const x = compact ? left : 120;
-  const width = compact ? right - left : 480;
-  const y = compact ? 132 : 132;
-  const height = compact ? 24 : 27;
-  const panelTop = y - 30;
-  const panelHeight = height + 42;
-  const ratio = getBossHpRatio(boss.hp, boss.maxHp);
-  const trailRatio = Math.max(ratio, getBossHpRatio(boss.hpTrail, boss.maxHp));
-
-  ctx.save();
-  ctx.fillStyle = "rgba(2, 9, 22, .9)";
-  ctx.fillRect(x - 10, panelTop, width + 20, panelHeight);
-  ctx.strokeStyle = "rgba(255, 95, 52, .68)";
-  ctx.lineWidth = 2;
-  ctx.strokeRect(x - 10, panelTop, width + 20, panelHeight);
-
-  ctx.textAlign = "left";
-  ctx.fillStyle = "#ffd2b7";
-  ctx.font = compact ? "900 13px Bahnschrift, sans-serif" : "900 15px Bahnschrift, sans-serif";
-  ctx.fillText(`${STR.boss} // ${STR[stage.bossKey]}`, x, y - 9);
-  ctx.textAlign = "right";
-  ctx.fillStyle = "#f4fbff";
-  ctx.font = compact ? "800 12px Bahnschrift, sans-serif" : "800 14px Bahnschrift, sans-serif";
-  ctx.fillText(`${Math.ceil(boss.hp).toLocaleString()} / ${Math.ceil(boss.maxHp).toLocaleString()}`, x + width, y - 9);
-
-  ctx.fillStyle = "rgba(3, 14, 27, .94)";
-  ctx.fillRect(x, y, width, height);
-  if (trailRatio > ratio + 0.001) {
-    ctx.fillStyle = "rgba(255, 170, 91, .72)";
-    ctx.fillRect(x + 2, y + 2, Math.max(0, width - 4) * trailRatio, height - 4);
+  if (state.boss?.active) {
+    const boss = state.boss;
+    const x = compact ? left : 120;
+    const y = compact ? 157 : 135;
+    const width = compact ? right - left : 480;
+    drawBar(x, y, width, 18, boss.hp / boss.maxHp, "#ff5f34", STR[stage.bossKey]);
   }
-  ctx.fillStyle = "#ff5f34";
-  ctx.fillRect(x + 2, y + 2, Math.max(0, width - 4) * ratio, height - 4);
-  ctx.strokeStyle = "rgba(255, 222, 204, .64)";
-  ctx.lineWidth = 2;
-  ctx.strokeRect(x, y, width, height);
-  ctx.strokeStyle = "rgba(255, 225, 211, .72)";
-  ctx.lineWidth = 1;
-  for (const marker of [1 / 3, 2 / 3]) {
-    ctx.beginPath();
-    ctx.moveTo(x + width * marker, y + 3);
-    ctx.lineTo(x + width * marker, y + height - 3);
-    ctx.stroke();
-  }
-  ctx.restore();
-}
-
-function drawBossHitFeedback(compact) {
-  if (state.bossHitTime <= 0) return;
-  const duration = 0.78;
-  const elapsed = duration - state.bossHitTime;
-  const alpha = Math.min(1, elapsed / 0.08, state.bossHitTime / 0.22);
-  const rise = Math.min(44, elapsed * 68);
-  const x = state.bossHitX;
-  const y = state.bossHitY - 70 - rise;
-  const color = state.bossHitSource === "missile" ? "#ffd45b" : "#ff9a45";
-
-  ctx.save();
-  ctx.globalAlpha = alpha;
-  ctx.textAlign = "center";
-  ctx.fillStyle = color;
-  ctx.shadowBlur = 18;
-  ctx.shadowColor = color;
-  ctx.font = compact ? "900 26px Bahnschrift, sans-serif" : "900 34px Bahnschrift, sans-serif";
-  ctx.fillText(`-${Math.max(1, Math.ceil(state.bossHitAmount))}`, x, y);
-  ctx.shadowBlur = 0;
-  ctx.fillStyle = "#f4fbff";
-  ctx.font = compact ? "900 11px Bahnschrift, sans-serif" : "900 14px Bahnschrift, sans-serif";
-  ctx.fillText(STR.bossHit, x, y + (compact ? 17 : 21));
-  ctx.restore();
 }
 
 function drawHudBanner(compact, left, right) {
@@ -2793,7 +2715,7 @@ function drawHud() {
   const margin = compact ? 18 : 28;
   const left = visibleWorld.left + margin;
   const right = visibleWorld.right - margin;
-  const panelHeight = compact ? 164 : 158;
+  const panelHeight = compact ? 132 : 128;
   ctx.save();
   ctx.fillStyle = "rgba(2, 9, 22, .62)";
   ctx.fillRect(visibleWorld.left, 0, visibleWorld.width, panelHeight);
@@ -2801,7 +2723,6 @@ function drawHud() {
   if (compact) drawCompactHud(stage, left, right, shieldText);
   else drawFullHud(stage, shieldText);
   drawBossHud(stage, compact, left, right);
-  drawBossHitFeedback(compact);
   drawHudBanner(compact, left, right);
   drawHudIntro();
   drawActionFeedback(compact);
@@ -2927,9 +2848,6 @@ function debugSnapshot() {
     playerY: Math.round(player.y),
     bossActive: Boolean(state.boss?.active),
     bossHp: state.boss?.active ? Math.round(state.boss.hp) : 0,
-    bossHpRatio: state.boss?.active ? Number(getBossHpRatio(state.boss.hp, state.boss.maxHp).toFixed(3)) : 0,
-    bossHitTime: Number(state.bossHitTime.toFixed(2)),
-    bossHitAmount: Math.round(state.bossHitAmount),
     pendingVictory: state.pendingVictory,
     testMode: TEST_MODE,
     testInvincible: TEST_MODE && testInvincible,
